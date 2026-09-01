@@ -1,5 +1,5 @@
 const APP_BASE = "/richdisk/kkirikiri-haerugil";
-const CACHE_NAME = "kkirikiri-pages-shell-v1";
+const CACHE_NAME = "kkirikiri-pages-shell-v2-vite";
 const STATIC_ASSETS = [
   `${APP_BASE}/`,
   `${APP_BASE}/calendar/`,
@@ -33,8 +33,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  const isStaticAsset = url.pathname.startsWith(`${APP_BASE}/assets/static/`)
-    || url.pathname.startsWith(`${APP_BASE}/assets/`)
+  const isStaticAsset = url.pathname.startsWith(`${APP_BASE}/assets/`)
     || /\.(?:png|svg|ico|webmanifest|woff2?)$/i.test(url.pathname);
 
   if (isStaticAsset) {

@@ -1,2 +1,0 @@
-:HL["/richdisk/kkirikiri-haerugil/assets/static/chunks/0zx2y5cb8u69e.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"calendar","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}},"staleTime":300,"buildId":"Ht5HNqDnFKFopO5zJilQg"}
