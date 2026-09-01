@@ -1,0 +1,628 @@
+{
+  "channels": [
+    {
+      "id": "UCDNvRZRgvkBTUkQzFoT_8rA",
+      "name": "뜬뜬 DdeunDdeun",
+      "handle": "ddeunddeun",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCikSO7mSQl-lx3BJOBzqA8w",
+      "name": "짠한형 신동엽",
+      "handle": "zzanbro",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCQ2O-iftmnlfrBuNsUUTofQ",
+      "name": "채널십오야",
+      "handle": "15ya_egg",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCGX5sP4ehBkihHwt5bs5wvg",
+      "name": "피식대학 Psick Univ",
+      "handle": "피식대학",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCSc2DcSzzjHgBn8Hg0KG7PA",
+      "name": "꼰대희",
+      "handle": "ggondaehee",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCwx6n_4OcLgzAGdty0RWCoA",
+      "name": "워크맨-Workman",
+      "handle": "workman",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCmbGE7Y2ov7pTBuUrkXgtTQ",
+      "name": "할명수",
+      "handle": "halmyungsoo",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UC1B6SalAoiJD7eHfMUA9QrA",
+      "name": "숏박스",
+      "handle": "shortbox",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UC5xLohcPE65Y-U62X6snmRQ",
+      "name": "빠더너스 BDNS",
+      "handle": "bdns",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCdMeT09aEFDCH0NghWV41HQ",
+      "name": "핫이슈지",
+      "handle": "핫이슈지",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCrAhzG4rf642oTUCpdyo5Vw",
+      "name": "동네친구 강나미",
+      "handle": "sanghwahusband",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCMDHzyo0wIUjKXho-icJDjw",
+      "name": "추성훈 ChooSungHoon",
+      "handle": "Choosunghoon_ajossi",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCoe-0EVDJnjlSoPK8ygcGwQ",
+      "name": "김종국 GYM JONG KOOK",
+      "handle": "GYMJONGKOOK",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCw-kXdzxMdMdLNI0ZlFFbmA",
+      "name": "오늘의 주우재",
+      "handle": "todaysjoowoojae",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCvAewWPqooIUgQUsjhTmUVw",
+      "name": "김숙티비 kimsookTV",
+      "handle": "kimsookTV",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCsbNh54XE17pOZrdqW3VyXQ",
+      "name": "정형돈의 제목없음TV",
+      "handle": "dony_untitled",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCiVs2pnGW5mLIc1jS2nxhjg",
+      "name": "김프로 KIMPRO",
+      "handle": "kimpro828",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCU8uafr_iROxRVI6c23Q_bA",
+      "name": "흔한남매",
+      "handle": "hhnm",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UC1Rz7a_DWtsE9cQwSyElE0Q",
+      "name": "인생84",
+      "handle": "geean84",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UC-OcDPFxfY9Hhdf5P9zq7-A",
+      "name": "메타코미디클럽",
+      "handle": "metacomedyclub",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCXEKwWflysXu312NmIP_dlw",
+      "name": "너덜트 NERDULT",
+      "handle": "NERDULT",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCe9f9MVu4WVCA3tVWtgSswA",
+      "name": "뷰티풀너드",
+      "handle": "beautifulnerd",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UClgQvJio7ylGa9kV9b7VzLQ",
+      "name": "스낵타운",
+      "handle": "snacktown",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UC7_CFRfhIj-fSk3patOQOaw",
+      "name": "싱글벙글 SGBG",
+      "handle": "SGBG",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UC1x03ziDHPct2xTikLyfMDA",
+      "name": "킥서비스",
+      "handle": "kickservice",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UC6IqHw1J10LWb-Qos5Xs0Nw",
+      "name": "하이픽션",
+      "handle": "highfiction",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCv-HJGOUupbVHCEBRdcLuVA",
+      "name": "180초",
+      "handle": "180seconds",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCdlr0rVI5wXFAKifpPm6JPA",
+      "name": "웃기시네",
+      "handle": "웃기시네",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCRykAtJOBcxnAJHmSVZhomw",
+      "name": "보따",
+      "handle": "bodda",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCXTQWsvCnuKxqnbBFMYhrSA",
+      "name": "별놈들",
+      "handle": "별놈들",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCLVwgJVAzHwA-zv88mrAeZw",
+      "name": "낄낄상회",
+      "handle": "낄낄상회",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCeS6R89S32mSOxTNoEqrN7g",
+      "name": "사내뷰공업 beautyfool",
+      "handle": "beautyfool",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCPZ4e8BQEM-BlepSeZUESSw",
+      "name": "강유미 좋아서 하는 채널",
+      "handle": "yumikang",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCK3p1wDoQYOkxi414EvBlLw",
+      "name": "하하 PD HAHA PD",
+      "handle": "HAHA_PD",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UC2E-9AQ-kwOFlvvXLfY6V8Q",
+      "name": "홍현희·제이쓴의 홍쓴TV",
+      "handle": "홍쓴TV",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UC0QKPVkRkvgupomhEYK1Uhw",
+      "name": "나몰라패밀리 핫쇼",
+      "handle": "NamollaFamily-Hotshow",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCSSkHIU1-nL_FeCjeZ_Xtvg",
+      "name": "노빠꾸탁재훈",
+      "handle": "노빠꾸탁재훈",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCCZ-gBdN59pF39tbm16xvdQ",
+      "name": "찰스엔터",
+      "handle": "찰스엔터",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCEX1cZB5TL7jyKejXdTXCKA",
+      "name": "랄랄 ralral",
+      "handle": "ralral",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UC-uIpGINZDL-VIHQQzJW8jw",
+      "name": "TEO 테오 · 살롱드립",
+      "handle": "TEO_universe",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UChdqwmHLPoL3UJmm9Fw-LsA",
+      "name": "차린건 쥐뿔도 없지만",
+      "handle": "youngji_boxmedia",
+      "country": "KR",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCK1sVuXaDvJeNwl9noN5nOA",
+      "name": "KBS Entertain",
+      "handle": "KBSEnt",
+      "country": "KR",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCiBr0bK06imaMbLc8sAEz0A",
+      "name": "MBCentertainment",
+      "handle": "MBCentertainment",
+      "country": "KR",
+      "source": "broadcaster",
+      "defaultCategory": "classic"
+    },
+    {
+      "id": "UCmjNKt6kITwaZTqvWuaSPLg",
+      "name": "SBS Entertainment",
+      "handle": "SBSenter.official",
+      "country": "KR",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCFL1sCAksD6_7JIZwwHcwjQ",
+      "name": "JTBC Entertainment",
+      "handle": "JTBCentertainment",
+      "country": "KR",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCsRIHt5FkbGc6cQtCxt-ufA",
+      "name": "tvN D ENT",
+      "handle": "tvNDENT",
+      "country": "KR",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCXVfodmlGhUpLREncSjuYAw",
+      "name": "KBS COMEDY: 크큭티비",
+      "handle": "KBSCOMEDY",
+      "country": "KR",
+      "source": "broadcaster",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCUyfkq9e9ZfPzxOW5WQ9rzQ",
+      "name": "MMTG 문명특급",
+      "handle": "MMTG",
+      "country": "KR",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCqFzWxSCi39LnW1JKFR3efg",
+      "name": "Saturday Night Live",
+      "handle": "SaturdayNightLive",
+      "country": "US",
+      "source": "broadcaster",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCUsN5ZwHx2kILm84-jPDeXw",
+      "name": "Comedy Central",
+      "handle": "ComedyCentral",
+      "country": "US",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCwWhs_6x42TyRM4Wstoq8HA",
+      "name": "The Daily Show",
+      "handle": "TheDailyShow",
+      "country": "US",
+      "source": "broadcaster",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UC8-Th83bH_thdKZDJCrn88g",
+      "name": "The Tonight Show Starring Jimmy Fallon",
+      "handle": "fallontonight",
+      "country": "US",
+      "source": "broadcaster",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCa6vGFO9ty8v5KZJXQxdhaw",
+      "name": "Jimmy Kimmel Live",
+      "handle": "JimmyKimmelLive",
+      "country": "US",
+      "source": "broadcaster",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCVTyTA7-g9nopHeHbeuvpRA",
+      "name": "Late Night with Seth Meyers",
+      "handle": "LateNightSeth",
+      "country": "US",
+      "source": "broadcaster",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCi7GJNg51C3jgmYTUwqoUXA",
+      "name": "Team Coco",
+      "handle": "TeamCoco",
+      "country": "US",
+      "source": "creator",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UC4PooiX37Pld1T8J5SYT-SQ",
+      "name": "Good Mythical Morning",
+      "handle": "GoodMythicalMorning",
+      "country": "US",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCY30JRSgfhYXA6i6xX1erWg",
+      "name": "Smosh",
+      "handle": "smosh",
+      "country": "US",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCry6nxAo2tfVyO6lEboiU3w",
+      "name": "The Carol Burnett Show Official",
+      "handle": "CarolBurnettShow",
+      "country": "US",
+      "source": "broadcaster",
+      "defaultCategory": "classic"
+    },
+    {
+      "id": "UC7foTxErVJKorAitAcJuqDA",
+      "name": "BBC Comedy Greats",
+      "handle": "BBCComedyGreats",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "classic"
+    },
+    {
+      "id": "UCodptbjdNf75jEmin8sFZrg",
+      "name": "Live At The Apollo",
+      "handle": "LiveAtTheApollo",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCeYy3kNtk_vhVSxZhi1WGJw",
+      "name": "Would I Lie To You?",
+      "handle": "WILTY_TV",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UC4PziMH5MvvsmqM0VCZTy-g",
+      "name": "The Graham Norton Show",
+      "handle": "officialgrahamnorton",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UCT5C7yaO3RVuOgwP8JVAujQ",
+      "name": "Taskmaster",
+      "handle": "Taskmaster",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCz1hQ68G3XPVYEBoFDgSjcQ",
+      "name": "Channel 4 Entertainment",
+      "handle": "Channel4Entertainment",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCe6ye3l9WA4SdNkqgs0YeMA",
+      "name": "QI",
+      "handle": "TheQIElves",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCZ-8sxV1bMxJlm-e1dJNYVw",
+      "name": "8 Out of 10 Cats",
+      "handle": "8outof10cats",
+      "country": "GB",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCGm3CO6LPcN-Y7HIuyE0Rew",
+      "name": "Monty Python",
+      "handle": "MontyPython",
+      "country": "GB",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCkAGrHCLFmlK3H2kd6isipg",
+      "name": "Mr Bean",
+      "handle": "MrBean",
+      "country": "GB",
+      "source": "creator",
+      "defaultCategory": "classic"
+    },
+    {
+      "id": "UC-ASnhD1JXr-AISPr0tv_OA",
+      "name": "有吉の壁【公式】壁チャンネル",
+      "handle": "ariyoshinokabe",
+      "country": "JP",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCaPJaMy0_OZlNjq7BVyTnkA",
+      "name": "佐久間宣行のNOBROCK TV",
+      "handle": "NOBROCKTV",
+      "country": "JP",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCIR2mQ77wHrLMreV45nYhgw",
+      "name": "かまいたちチャンネル",
+      "handle": "kamaitachi",
+      "country": "JP",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCNvcNd31bA-XERO6LGy4blw",
+      "name": "さらば青春の光Official Youtube Channel",
+      "handle": "saraba",
+      "country": "JP",
+      "source": "creator",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UChwgNUWPM-ksOP3BbfQHS5Q",
+      "name": "ジャルジャルタワー JARUJARU TOWER",
+      "handle": "jarujaru",
+      "country": "JP",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCpCesuCH4UxIcy65gSrC0Pw",
+      "name": "チョコレートプラネット チャンネル",
+      "handle": "chocopla",
+      "country": "JP",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UCRaaCxSF8nEpfG3ZHesXKxw",
+      "name": "ジェラードンチャンネル",
+      "handle": "gerardon",
+      "country": "JP",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    },
+    {
+      "id": "UC0bRz2qCgQj7fGPHkKZ95vw",
+      "name": "ナンタラちゃんねる",
+      "handle": "nantara",
+      "country": "JP",
+      "source": "broadcaster",
+      "defaultCategory": "variety"
+    },
+    {
+      "id": "UCNdhTKY9QYzeVQGF2xtaHKQ",
+      "name": "オードリーさん、ぜひ会ってほしい人がいるんです。",
+      "handle": "audrey",
+      "country": "JP",
+      "source": "broadcaster",
+      "defaultCategory": "talk"
+    },
+    {
+      "id": "UConIcs8o0z5vYTamGtq-Lsw",
+      "name": "東京03 Official YouTube Channel",
+      "handle": "tokyo03",
+      "country": "JP",
+      "source": "creator",
+      "defaultCategory": "sketch"
+    }
+  ]
+}

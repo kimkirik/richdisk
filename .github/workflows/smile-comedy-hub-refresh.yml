@@ -1,0 +1,36 @@
+name: Refresh Smile Comedy Hub
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: smile-comedy-hub-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the public site
+        uses: actions/checkout@v4
+
+      - name: Refresh official YouTube feeds
+        run: node smile-comedy-hub/scripts/update-data.mjs
+
+      - name: Publish refreshed rankings
+        run: |
+          if git diff --quiet -- smile-comedy-hub/data; then
+            echo "Video rankings are already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add smile-comedy-hub/data/*.json
+          git commit -m "Refresh Smile Comedy Hub rankings"
+          git push
