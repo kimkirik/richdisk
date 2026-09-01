@@ -1,0 +1,30 @@
+{
+  "name": "오늘도 건강하개",
+  "short_name": "건강하개",
+  "description": "리치의 매일 건강 기록과 나들이 추천",
+  "start_url": "/richdisk/today-healthy-pet/",
+  "scope": "/richdisk/today-healthy-pet/",
+  "display": "standalone",
+  "background_color": "#fff9f0",
+  "theme_color": "#f2955e",
+  "icons": [
+    {
+      "src": "/richdisk/today-healthy-pet/rich-ghibli-seaside-smile-compact-ears-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/richdisk/today-healthy-pet/rich-ghibli-seaside-smile-compact-ears-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/richdisk/today-healthy-pet/rich-ghibli-seaside-smile-compact-ears-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
