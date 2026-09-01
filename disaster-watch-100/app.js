@@ -1,5 +1,14 @@
-(()=>{
+(async()=>{
   "use strict";
+  if(!window.DISASTER_DATA){
+    try{
+      const response=await fetch(`./data.js?v=${Date.now()}`,{cache:"no-store"});
+      if(!response.ok)throw new Error(`data ${response.status}`);
+      const source=await response.text();const prefix="window.DISASTER_DATA=";
+      if(!source.startsWith(prefix))throw new Error("invalid data payload");
+      window.DISASTER_DATA=JSON.parse(source.slice(prefix.length).replace(/;\s*$/,"").trim());
+    }catch(error){console.warn("영상 데이터를 불러오지 못했습니다.",error)}
+  }
   const payload=window.DISASTER_DATA||{videos:[],candidateCount:0,generatedAt:null,source:"backup"};
   const categoryOptions=[
     ["전체","◉"],["지진·쓰나미","⌁"],["홍수·폭우","≋"],["태풍·허리케인","◌"],
