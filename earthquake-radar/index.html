@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07111a">
+  <meta name="description" content="전 세계 지진·홍수·산불·복합재난 취약지를 확인하는 지진 레이더">
+  <title>지진 레이더</title>
+  <link rel="icon" href="./quake-icon.svg" type="image/svg+xml">
+  <style>
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#07111a;color:#dff7ff;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif}
+    #app{position:fixed;inset:0;width:100%;height:100%;border:0;background:#07111a}
+    #loading{position:fixed;inset:0;z-index:2;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#123141,#07111a 65%);transition:opacity .25s ease}
+    #loading.hidden{opacity:0;pointer-events:none}
+    .box{text-align:center;padding:24px}.pulse{width:46px;height:46px;margin:0 auto 14px;border:3px solid #4bd9ff;border-radius:50%;animation:pulse 1.2s infinite}.box b{display:block;font-size:18px}.box small{display:block;margin-top:7px;color:#8fb1bf}
+    #fallback{position:fixed;z-index:3;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);display:none;padding:10px 15px;border:1px solid #477285;border-radius:999px;background:#0b2330;color:#e7fbff;text-decoration:none;font-weight:700;box-shadow:0 8px 30px #0008;white-space:nowrap}
+    @keyframes pulse{0%{transform:scale(.75);opacity:.4}60%{transform:scale(1);opacity:1}100%{transform:scale(1.15);opacity:0}}
+  </style>
+</head>
+<body>
+  <iframe id="app" title="지진 레이더" src="https://earthquake-radar-public.kimkirik.chatgpt.site/" allow="geolocation; fullscreen; clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  <div id="loading" role="status" aria-live="polite"><div class="box"><div class="pulse"></div><b>지진 레이더를 여는 중</b><small>실시간 재난 자료를 연결하고 있습니다.</small></div></div>
+  <a id="fallback" href="https://earthquake-radar-public.kimkirik.chatgpt.site/">새 창에서 지진 레이더 열기</a>
+  <script>
+    const frame=document.getElementById('app');
+    const loading=document.getElementById('loading');
+    const fallback=document.getElementById('fallback');
+    frame.addEventListener('load',()=>loading.classList.add('hidden'));
+    setTimeout(()=>{loading.classList.add('hidden');fallback.style.display='block'},12000);
+  </script>
+</body>
+</html>
