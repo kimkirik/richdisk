@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="네온 발바닥">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="72%">
+      <stop offset="0" stop-color="#17123a"/>
+      <stop offset=".55" stop-color="#080717"/>
+      <stop offset="1" stop-color="#030308"/>
+    </radialGradient>
+    <linearGradient id="paw" x1="90" y1="80" x2="420" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#63cfff"/>
+      <stop offset=".48" stop-color="#526bff"/>
+      <stop offset="1" stop-color="#ffd84a"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="192" fill="none" stroke="#2f80ff" stroke-opacity=".2" stroke-width="4"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#ffd84a" stroke-opacity=".13" stroke-width="3"/>
+  <g fill="url(#paw)" stroke="#dff6ff" stroke-opacity=".55" stroke-width="4" filter="url(#glow)">
+    <ellipse cx="137" cy="204" rx="43" ry="55" transform="rotate(-24 137 204)"/>
+    <ellipse cx="216" cy="135" rx="43" ry="57" transform="rotate(-8 216 135)"/>
+    <ellipse cx="296" cy="135" rx="43" ry="57" transform="rotate(8 296 135)"/>
+    <ellipse cx="375" cy="204" rx="43" ry="55" transform="rotate(24 375 204)"/>
+    <path d="M256 219c-75 0-126 64-126 132 0 55 43 78 87 60 25-10 53-10 78 0 44 18 87-5 87-60 0-68-51-132-126-132Z"/>
+  </g>
+</svg>
