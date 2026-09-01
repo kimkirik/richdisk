@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10191c">
+  <meta name="description" content="전 세계 재난 관련 YouTube 영상 TOP 100을 카테고리와 정렬 방식별로 확인합니다.">
+  <title>재난에 대비해요 · 세계 재난 영상 100</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="재난에 대비해요 처음으로">
+      <img src="./icon.svg" alt="" width="48" height="48">
+      <span><b>재난에 대비해요</b><small>DISASTER WATCH 100</small></span>
+    </a>
+    <span class="live"><i></i>공개 영상 갱신</span>
+  </header>
+
+  <main id="top">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">전 세계 재난 영상 색인</p>
+        <h1>위험의 순간을<br><em>기록하고 대비하다.</em></h1>
+      </div>
+      <dl class="stats">
+        <div><dt id="candidateCount">확인 중</dt><dd>검색 후보</dd></div>
+        <div><dt>100</dt><dd>최종 추출</dd></div>
+        <div><dt>13</dt><dd>재난 유형</dd></div>
+      </dl>
+    </section>
+
+    <section class="controls" aria-label="영상 필터">
+      <div class="filter-grid">
+        <label class="select-field category-field"><span>카테고리</span><select id="category" aria-label="카테고리 선택"></select></label>
+        <label class="select-field"><span>정렬 방식</span><select id="sort" aria-label="정렬 방식 선택">
+          <option value="latest">최신순</option>
+          <option value="views">조회수순</option>
+          <option value="recommended">추천순</option>
+          <option value="oldest">오래된순</option>
+        </select></label>
+        <label class="select-field"><span>제목 언어</span><select id="language" aria-label="제목 언어 선택">
+          <option value="ko">한국어 번역</option>
+          <option value="original">원문</option>
+        </select></label>
+        <label class="search-field"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="국가, 채널, 재난 검색" aria-label="영상 검색"></label>
+      </div>
+      <div class="data-state" id="dataState" role="status"><i></i><span>영상 목록을 준비하고 있습니다.</span></div>
+    </section>
+
+    <section class="ranking" aria-labelledby="rankingTitle">
+      <div class="section-head">
+        <div><span id="rankingLabel">최신 순위</span><h2 id="rankingTitle">재난 영상 TOP 100</h2></div>
+        <p>썸네일이나 제목을 누르면 YouTube에서 재생됩니다.</p>
+      </div>
+      <div class="notice">
+        <b>실제 YouTube 영상</b>
+        <span><i class="dot observed"></i>원본 썸네일</span>
+        <span><i class="dot play-dot"></i>YouTube에서 재생</span>
+        <small id="languageNotice">외국어 제목은 한글로 표시하고 원제도 함께 보여줍니다.</small>
+      </div>
+      <div class="grid" id="videoGrid"></div>
+      <div class="empty" id="empty" hidden>검색 결과가 없습니다.</div>
+      <button class="more" id="more" type="button" hidden>더 불러오기 <span></span></button>
+    </section>
+  </main>
+
+  <footer>
+    <b>재난에 대비해요</b>
+    <p>위험을 소비하지 않고, 기록을 통해 대비합니다.</p>
+    <small>본 서비스는 재난 예보 기관이 아닙니다. 긴급 상황에서는 현지 정부와 공식 재난기관의 안내를 따르세요.</small>
+  </footer>
+
+  <script src="./data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
