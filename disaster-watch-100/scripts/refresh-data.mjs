@@ -4,9 +4,12 @@ import {dirname,join} from "node:path";
 
 const ROOT=dirname(dirname(fileURLToPath(import.meta.url)));
 const OUTPUT=join(ROOT,"data.js");
-const MAX_PER_CATEGORY=140;
-const SEARCH_CONCURRENCY=4;
+const MAX_PER_CATEGORY=120;
+const MAX_SEARCH_PAGES=5;
+const SEARCH_CONCURRENCY=6;
+const CATEGORY_CONCURRENCY=3;
 const TRANSLATE_CONCURRENCY=4;
+const COMMENT_CONCURRENCY=12;
 const INVIDIOUS=["https://inv.nadeko.net","https://invidious.nerdvpn.de","https://yt.chocolatemoo53.com"];
 
 const queries={
@@ -58,8 +61,8 @@ async function mapLimit(values,limit,worker){
 
 function parseInvidious(item,category,rank){
   if(!item||item.type!=="video"||item.isUpcoming===true||!validId(item.videoId))return null;
-  const title=clean(item.title);const date=publishedAt(item.published)||new Date().toISOString();if(!title)return null;
-  return {category,originalTitle:title,titleKo:"",countryKo:countryOf(title),year:Number(date.slice(0,4)),youtubeId:item.videoId,channel:clean(item.author)||"YouTube",publishedAt:date,viewCount:numberOf(item.viewCount),rank,isLive:true};
+  const title=clean(item.title);const date=publishedAt(item.published);if(!title)return null;
+  return {category,originalTitle:title,titleKo:"",countryKo:countryOf(title),year:date?Number(date.slice(0,4)):0,youtubeId:item.videoId,channel:clean(item.author)||"YouTube",publishedAt:date,viewCount:numberOf(item.viewCount),rank,isLive:true};
 }
 
 function rendererText(value){if(!value||typeof value!=="object")return"";if(typeof value.simpleText==="string")return value.simpleText.trim();return Array.isArray(value.runs)?value.runs.map(run=>typeof run?.text==="string"?run.text:"").join("").trim():""}
@@ -68,8 +71,8 @@ function compactViews(value){const normalized=value.replace(/,/g,"");const match
 function extractObjects(html,marker,limit=30){const found=[];let cursor=0;while(found.length<limit){const at=html.indexOf(marker,cursor);if(at<0)break;const start=html.indexOf("{",at+marker.length);if(start<0)break;let depth=0,quoted=false,escaped=false,end=-1;for(let i=start;i<html.length;i++){const char=html[i];if(quoted){if(escaped)escaped=false;else if(char==="\\")escaped=true;else if(char==='"')quoted=false;continue}if(char==='"'){quoted=true;continue}if(char==="{")depth++;else if(char==="}"&&--depth===0){end=i+1;break}}if(end<0)break;found.push(html.slice(start,end));cursor=end}return found}
 function parseRenderer(item,category,rank){
   const id=item?.videoId,title=clean(rendererText(item?.title));if(!validId(id)||!title||item?.upcomingEventData)return null;
-  const date=relativeDate(rendererText(item.publishedTimeText))||new Date().toISOString();
-  return {category,originalTitle:title,titleKo:"",countryKo:countryOf(title),year:Number(date.slice(0,4)),youtubeId:id,channel:clean(rendererText(item.ownerText)||rendererText(item.longBylineText))||"YouTube",publishedAt:date,viewCount:compactViews(rendererText(item.viewCountText)),rank,isLive:true};
+  const date=relativeDate(rendererText(item.publishedTimeText));
+  return {category,originalTitle:title,titleKo:"",countryKo:countryOf(title),year:date?Number(date.slice(0,4)):0,youtubeId:id,channel:clean(rendererText(item.ownerText)||rendererText(item.longBylineText))||"YouTube",publishedAt:date,viewCount:compactViews(rendererText(item.viewCountText)),rank,isLive:true};
 }
 
 function datedQuery(query,page){if(page===1)return query;const end=new Date().getUTCFullYear()+1-(page-2)*4;return `${query} after:${Math.max(2005,end-4)}-01-01 before:${end}-01-01`}
@@ -83,14 +86,14 @@ async function searchOne(query,category,page,rankBase){
   for(let rotation=0;rotation<2;rotation++){
     const base=INVIDIOUS[(start+rotation)%INVIDIOUS.length];const url=new URL("/api/v1/search",base);
     url.searchParams.set("q",query);url.searchParams.set("type","video");url.searchParams.set("page",String(page));url.searchParams.set("sort_by",page===1?"relevance":page===2?"upload_date":"view_count");
-    try{const response=await timedFetch(url,{},3500);if(!response.ok)continue;const json=await response.json();if(!Array.isArray(json))continue;const videos=json.map((item,index)=>parseInvidious(item,category,rankBase+index)).filter(Boolean);if(videos.length)return videos}catch{}
+    try{const response=await timedFetch(url,{},3500);if(!response.ok)continue;const json=await response.json();if(!Array.isArray(json))continue;const videos=json.map((item,index)=>parseInvidious(item,category,rankBase+index)).filter(Boolean).map(video=>({...video,_commentsBase:base}));if(videos.length)return videos}catch{}
   }
   return youtubeFallback(query,category,page,rankBase);
 }
 
 async function searchCategory(category,categoryQueries){
   const pool=new Map();let candidateCount=0,rankBase=1;
-  for(let page=1;page<=3&&pool.size<MAX_PER_CATEGORY;page++){
+  for(let page=1;page<=MAX_SEARCH_PAGES&&pool.size<MAX_PER_CATEGORY;page++){
     const batches=await mapLimit(categoryQueries,SEARCH_CONCURRENCY,(query,index)=>searchOne(query,category,page,rankBase+index*40));
     for(const videos of batches.filter(Boolean)){candidateCount+=videos.length;for(const video of videos){const current=pool.get(video.youtubeId);if(!current||video.viewCount>current.viewCount)pool.set(video.youtubeId,current?{...video,rank:current.rank}:video)}}
     rankBase+=categoryQueries.length*40;
@@ -100,10 +103,14 @@ async function searchCategory(category,categoryQueries){
 }
 
 async function edgeChunk(items){
-  try{const response=await timedFetch("https://edge.microsoft.com/translate/translatetext?from=&to=ko&isEnterpriseClient=false",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(items.map(item=>item.originalTitle))},7000);if(!response.ok)return new Map();const json=await response.json();const result=new Map();items.forEach((item,index)=>{const translated=json?.[index]?.translations?.[0]?.text?.trim();if(usefulTranslation(item.originalTitle,translated))result.set(item.originalTitle,translated)});return result}catch{return new Map()}
+  for(let attempt=0;attempt<2;attempt++)try{const response=await timedFetch("https://edge.microsoft.com/translate/translatetext?from=&to=ko&isEnterpriseClient=false",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(items.map(item=>item.originalTitle))},7000);if(!response.ok)throw new Error(String(response.status));const json=await response.json();const result=new Map();items.forEach((item,index)=>{const translated=json?.[index]?.translations?.[0]?.text?.trim();if(usefulTranslation(item.originalTitle,translated))result.set(item.originalTitle,translated)});return result}catch{await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)))}return new Map()
 }
 async function googleOne(title){
-  try{const url=new URL("https://translate.googleapis.com/translate_a/single");url.searchParams.set("client","gtx");url.searchParams.set("sl","auto");url.searchParams.set("tl","ko");url.searchParams.set("dt","t");url.searchParams.set("q",title);const response=await timedFetch(url,{},4500);if(!response.ok)return null;const json=await response.json();const translated=Array.isArray(json?.[0])?json[0].map(segment=>Array.isArray(segment)?segment[0]||"":"").join("").trim():"";return usefulTranslation(title,translated)?translated:null}catch{return null}
+  for(let attempt=0;attempt<3;attempt++){
+    try{const url=new URL("https://translate.googleapis.com/translate_a/single");url.searchParams.set("client","gtx");url.searchParams.set("sl","auto");url.searchParams.set("tl","ko");url.searchParams.set("dt","t");url.searchParams.set("q",title);const response=await timedFetch(url,{},5500);if(!response.ok)throw new Error(String(response.status));const json=await response.json();const translated=Array.isArray(json?.[0])?json[0].map(segment=>Array.isArray(segment)?segment[0]||"":"").join("").trim():"";if(usefulTranslation(title,translated))return translated}catch{}
+    await new Promise(resolve=>setTimeout(resolve,350*(attempt+1)));
+  }
+  return null;
 }
 async function translate(videos){
   const foreign=[...new Map(videos.filter(video=>needsKorean(video.originalTitle)).map(video=>[video.originalTitle,video])).values()];const translations=new Map();
@@ -115,13 +122,26 @@ async function translate(videos){
   return videos.map(video=>({...video,titleKo:translations.get(video.originalTitle)||(!needsKorean(video.originalTitle)?video.originalTitle:`${video.countryKo} ${video.category} 관련 영상`)}));
 }
 
+async function commentCountFrom(base,videoId){
+  try{const url=new URL(`/api/v1/comments/${videoId}`,base);url.searchParams.set("sort_by","top");url.searchParams.set("source","youtube");const response=await timedFetch(url,{},5000);if(!response.ok)return null;const json=await response.json();if(json?.commentCount===undefined||json?.commentCount===null)return null;const count=numberOf(json.commentCount);return Number.isFinite(count)?count:null}catch{return null}
+}
+async function loadCommentCounts(videos){
+  let found=0;
+  const values=await mapLimit(videos,COMMENT_CONCURRENCY,async video=>{
+    const bases=[video._commentsBase,...INVIDIOUS].filter((value,index,array)=>value&&array.indexOf(value)===index);
+    for(const base of bases){const count=await commentCountFrom(base,video.youtubeId);if(count!==null){found++;return count}}
+    return 0;
+  });
+  console.log(`Comment counts: ${found}/${videos.length}`);return new Map(videos.map((video,index)=>[video.youtubeId,values[index]||0]));
+}
+
 async function main(){
-  const categoryResults=[];
-  for(const [category,categoryQueries] of Object.entries(queries))categoryResults.push(await searchCategory(category,categoryQueries));
+  const categoryResults=await mapLimit(Object.entries(queries),CATEGORY_CONCURRENCY,([category,categoryQueries])=>searchCategory(category,categoryQueries));
   const rawVideos=categoryResults.flatMap(result=>result.videos);const candidateCount=categoryResults.reduce((sum,result)=>sum+result.candidateCount,0);
   const sufficientlyComplete=Object.keys(queries).filter(category=>rawVideos.filter(video=>video.category===category).length>=100).length;
   if(rawVideos.length<1300||sufficientlyComplete!==Object.keys(queries).length)throw new Error(`Public search was incomplete: ${rawVideos.length} videos, ${sufficientlyComplete} complete categories`);
-  const videos=await translate(rawVideos);const payload={schema:1,generatedAt:new Date().toISOString(),candidateCount,source:"public-search",videos};
+  const [translated,commentCounts]=await Promise.all([translate(rawVideos),loadCommentCounts(rawVideos)]);
+  const videos=translated.map(({_commentsBase,...video})=>({...video,commentCount:commentCounts.get(video.youtubeId)||0}));const payload={schema:1,generatedAt:new Date().toISOString(),candidateCount,source:"public-search",videos};
   await writeFile(OUTPUT,`window.DISASTER_DATA=${JSON.stringify(payload)};\n`,"utf8");console.log(`Wrote ${videos.length} videos to ${OUTPUT}`);
 }
 
