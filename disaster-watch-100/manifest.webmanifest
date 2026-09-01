@@ -1,0 +1,10 @@
+{
+  "name":"재난에 대비해요",
+  "short_name":"재난영상100",
+  "description":"전 세계 재난 관련 YouTube 영상 TOP 100",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f3f1ea",
+  "theme_color":"#10191c",
+  "icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
