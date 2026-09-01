@@ -7,7 +7,7 @@
     ["폭염·한파·폭설","✣"],["가뭄·사막화","☼"],["낙뢰·우박","ϟ"],
     ["싱크홀","⊙"],["운석·우주기상","✦"],["UFO·미확인","◇"]
   ];
-  const labels={latest:"최신 순위",views:"조회수 순위",recommended:"추천 순위",oldest:"오래된 순위"};
+  const labels={latest:"최신 순위",views:"조회수 순위",comments:"댓글 순위",recommended:"추천 순위",oldest:"오래된 순위"};
   const state={category:"전체",sort:"latest",language:localStorage.getItem("disaster-watch-language")==="original"?"original":"ko",query:"",limit:24};
   const els={
     category:document.getElementById("category"),sort:document.getElementById("sort"),language:document.getElementById("language"),
@@ -32,15 +32,17 @@
 
   function filtered(){
     const needle=state.query.trim().toLocaleLowerCase("ko");
-    const list=videos.filter(video=>{
+    let list=videos.filter(video=>{
       if(state.category!=="전체"&&video.category!==state.category)return false;
       if(!needle)return true;
       return `${koreanTitle(video)} ${originalOf(video)} ${video.countryKo||""} ${video.channel||""} ${video.category||""}`.toLocaleLowerCase("ko").includes(needle);
     });
+    if(state.category==="전체")list=[...new Map(list.map(video=>[video.youtubeId,video])).values()];
     return list.sort((a,b)=>{
       if(state.sort==="latest")return publishedTime(b)-publishedTime(a);
       if(state.sort==="oldest")return publishedTime(a)-publishedTime(b);
       if(state.sort==="views")return (Number(b.viewCount)||0)-(Number(a.viewCount)||0)||publishedTime(b)-publishedTime(a);
+      if(state.sort==="comments")return (Number(b.commentCount)||0)-(Number(a.commentCount)||0)||(Number(b.viewCount)||0)-(Number(a.viewCount)||0);
       return (Number(a.rank)||9999)-(Number(b.rank)||9999)||publishedTime(b)-publishedTime(a);
     }).slice(0,100);
   }
@@ -63,6 +65,7 @@
     if(video.countryKo){info.append(document.createTextNode(video.countryKo),text("i","","·"))}
     info.append(document.createTextNode(publishedLabel(video)));
     if(Number(video.viewCount)>0)info.append(text("span","views",`조회 ${compact(video.viewCount)}`));
+    if(Number(video.commentCount)>0)info.append(text("span","comments",`댓글 ${compact(video.commentCount)}`));
     body.append(info);anchor.append(visual,body);return anchor;
   }
 
