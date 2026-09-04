@@ -1,0 +1,82 @@
+{
+  "notices": [
+    {
+      "id": "lh-2015122300020620",
+      "title": "2026년 2차 든든전세주택 입주자 모집",
+      "source": "LH청약플러스",
+      "type": "매입임대",
+      "status": "공고중",
+      "postedAt": "2026-08-27",
+      "closeAt": "2026-09-09",
+      "location": "아산시 권곡동",
+      "units": 14,
+      "areaLabel": "23.6–25.6평",
+      "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?aisTpCd=26&ccrCnntSysDsCd=03&mi=1026&panId=2015122300020620&uppAisTpCd=13",
+      "alertKey": "lh-2015122300020620:change-iv35i2",
+      "missingChecks": 0
+    },
+    {
+      "id": "lh-2015122300019546",
+      "title": "2026 다자녀 전세임대 입주자 수시모집 공고",
+      "source": "마이홈포털",
+      "type": "전세임대",
+      "status": "모집중",
+      "postedAt": "2026-03-24",
+      "closeAt": "",
+      "location": "아산시 (공고 적용지역)",
+      "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300019546&ccrCnntSysDsCd=03&uppAisTpCd=13&aisTpCd=17&mi=1026",
+      "alertKey": "lh-2015122300019546:change-oar1y2",
+      "missingChecks": 0
+    },
+    {
+      "id": "lh-2015122300019550",
+      "title": "2026년 신혼·신생아 전세임대 I 입주자 수시모집 공고",
+      "source": "마이홈포털",
+      "type": "전세임대",
+      "status": "모집중",
+      "postedAt": "2026-03-24",
+      "closeAt": "",
+      "location": "아산시 (공고 적용지역)",
+      "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300019550&ccrCnntSysDsCd=03&uppAisTpCd=13&aisTpCd=17&mi=1026",
+      "alertKey": "lh-2015122300019550:change-2zwrtd",
+      "missingChecks": 0
+    },
+    {
+      "id": "lh-2015122300019551",
+      "title": "2026년 신혼·신생아 전세임대Ⅱ 입주자 수시모집 공고",
+      "source": "마이홈포털",
+      "type": "전세임대",
+      "status": "모집중",
+      "postedAt": "2026-03-24",
+      "closeAt": "",
+      "location": "아산시 (공고 적용지역)",
+      "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300019551&ccrCnntSysDsCd=03&uppAisTpCd=13&aisTpCd=17&mi=1026",
+      "alertKey": "lh-2015122300019551:change-skwvh5",
+      "missingChecks": 0
+    },
+    {
+      "id": "lh-2015122300019376",
+      "title": "2026년 청년 전세임대 1순위 입주자 수시모집",
+      "source": "마이홈포털",
+      "type": "전세임대",
+      "status": "모집중",
+      "postedAt": "2026-02-24",
+      "closeAt": "",
+      "location": "아산시 (공고 적용지역)",
+      "url": "https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300019376&ccrCnntSysDsCd=03&uppAisTpCd=13&aisTpCd=17&mi=1026",
+      "alertKey": "lh-2015122300019376:change-1cov3a6",
+      "missingChecks": 0
+    }
+  ],
+  "archived": [],
+  "checkedAt": "2026-09-04T20:38:03.626Z",
+  "sourceCount": 5,
+  "healthySourceCount": 5,
+  "sourceHealth": {
+    "LH청약플러스": true,
+    "마이홈포털": true,
+    "아산시청": true,
+    "충남개발공사": true,
+    "주택관리공단": true
+  }
+}

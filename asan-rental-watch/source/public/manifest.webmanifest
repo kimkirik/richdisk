@@ -1,0 +1,21 @@
+{
+  "name": "아산집 알리미",
+  "short_name": "아산집",
+  "description": "아산시 임대주택 새 모집공고와 평수별 월 주거비를 확인하는 앱",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f9",
+  "theme_color": "#165dff",
+  "categories": ["housing", "utilities"],
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
