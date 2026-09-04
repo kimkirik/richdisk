@@ -1,6 +1,11 @@
 name: Refresh Asan rental notices
 
 on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/asan-rental-watch-refresh.yml"
+      - "asan-rental-watch/scripts/update-notices.ts"
   schedule:
     - cron: "17 */4 * * *"
   workflow_dispatch:
