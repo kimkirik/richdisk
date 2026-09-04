@@ -101,29 +101,43 @@ function stableId(prefix: string, value: string) {
   return prefix + "-" + (hash >>> 0).toString(36);
 }
 
+async function fetchWithRetry(url: string, init: RequestInit, timeoutMs = 30000) {
+  let lastError: unknown = new Error("source-unavailable");
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal });
+      if (!response.ok) throw new Error("source-" + response.status);
+      return response;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
+  }
+  throw lastError;
+}
+
 async function fetchHtml(url: string) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 16000);
-  try {
-    const response = await fetch(url, {
+  const response = await fetchWithRetry(
+    url,
+    {
       headers: {
         Accept: "text/html,application/xhtml+xml",
         "User-Agent": "Mozilla/5.0 (compatible; AsanRentalWatch/1.0)",
       },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error("source-" + response.status);
-    return await response.text();
-  } finally {
-    clearTimeout(timeout);
-  }
+    },
+    30000,
+  );
+  return await response.text();
 }
 
 async function fetchJson<T>(url: string, body: URLSearchParams): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 16000);
-  try {
-    const response = await fetch(url, {
+  const response = await fetchWithRetry(
+    url,
+    {
       method: "POST",
       headers: {
         Accept: "application/json, text/javascript, */*; q=0.01",
@@ -133,13 +147,10 @@ async function fetchJson<T>(url: string, body: URLSearchParams): Promise<T> {
         "X-Requested-With": "XMLHttpRequest",
       },
       body,
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error("source-" + response.status);
-    return (await response.json()) as T;
-  } finally {
-    clearTimeout(timeout);
-  }
+    },
+    40000,
+  );
+  return (await response.json()) as T;
 }
 
 function compactDate(value: string | null | undefined) {
