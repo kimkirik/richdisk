@@ -69,12 +69,12 @@
     }
   ],
   "archived": [],
-  "checkedAt": "2026-09-04T20:47:37.994Z",
+  "checkedAt": "2026-09-04T20:46:49.676Z",
   "sourceCount": 5,
-  "healthySourceCount": 4,
+  "healthySourceCount": 5,
   "sourceHealth": {
     "LH청약플러스": true,
-    "마이홈포털": false,
+    "마이홈포털": true,
     "아산시청": true,
     "충남개발공사": true,
     "주택관리공단": true

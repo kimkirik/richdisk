@@ -298,8 +298,8 @@ export default function HomePage() {
             additions.slice(0, 3).map((notice) =>
               registration.showNotification("아산 임대주택 새 공고", {
                 body: notice.title,
-                icon: appUrl("favicon.svg"),
-                badge: appUrl("favicon.svg"),
+                icon: appUrl("icon-192.png"),
+                badge: appUrl("icon-192.png"),
                 tag: "asan-rental-" + (notice.alertKey ?? notice.id),
                 data: { url: notice.url },
               }),
@@ -383,8 +383,8 @@ export default function HomePage() {
     const registration = await navigator.serviceWorker.register(appUrl("sw.js"));
     await registration.showNotification("아산집 알리미가 켜졌어요", {
       body: "앞으로 앱에서 새 공고를 확인해 알려드릴게요.",
-      icon: appUrl("favicon.svg"),
-      badge: appUrl("favicon.svg"),
+      icon: appUrl("icon-192.png"),
+      badge: appUrl("icon-192.png"),
       tag: "asan-rental-ready",
       data: { url: "/" },
     });

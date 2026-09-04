@@ -4,7 +4,7 @@ const BASE_URL = new URL("./", self.registration.scope);
 const STATE_URL = new URL("__asan-rental-known-notices__", BASE_URL).href;
 const APP_URL = BASE_URL.href;
 const DATA_URL = new URL("data/notices.json", BASE_URL);
-const ICON_URL = new URL("favicon.svg", BASE_URL).href;
+const ICON_URL = new URL("icon-192.png", BASE_URL).href;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
