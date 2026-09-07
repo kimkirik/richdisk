@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#070914" />
   <meta name="description" content="음악과 함께 즐기는 프리미엄 테트리스 게임" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tetris Nocturne" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
-  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-install-192.png" />
   <title>Tetris Nocturne</title>
   <style>
     :root {
@@ -98,6 +103,24 @@
     .sound-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
     .sound.off .sound-dot { background: var(--muted); box-shadow: none; }
     .sound-label { font: 600 .66rem/1 ui-monospace, monospace; letter-spacing: .08em; }
+    .header-actions { display:flex; align-items:center; gap:.45rem; }
+    .install {
+      display:none;
+      min-height:40px;
+      align-items:center;
+      gap:.4rem;
+      border:1px solid rgba(217,185,110,.48);
+      border-radius:999px;
+      padding:.45rem .72rem;
+      color:#11131e;
+      background:linear-gradient(135deg,#f3ddb0,var(--gold));
+      font:700 .66rem/1 ui-monospace,monospace;
+      letter-spacing:.06em;
+      cursor:pointer;
+      box-shadow:0 8px 24px rgba(217,185,110,.15);
+    }
+    .install.available { display:inline-flex; }
+    .install-icon { font-size:1rem; line-height:1; }
 
     .layout {
       display: grid;
@@ -189,6 +212,8 @@
       .brand-copy small { font-size:.48rem; }
       .brand-copy strong { font-size:.88rem; }
       .sound { min-height:34px; padding:.34rem .56rem; }
+      .install { min-height:34px; padding:.34rem .55rem; }
+      .install-text { display:none; }
       .sound-label { font-size:.58rem; }
       .layout { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr) auto; gap:.28rem; width:100%; max-width:430px; min-height:0; margin:0 auto; padding:.28rem 0; }
       .score-rail { order:1; display:grid; grid-template-columns:1.35fr 1fr .9fr; align-items:end; padding:0 0 .25rem; border:0; border-bottom:1px solid rgba(217,185,110,.45); }
@@ -238,7 +263,10 @@
         <div class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="brand-copy"><small>NOCTURNE / 01</small><strong>TETRIS SOUNDSCAPE</strong></div>
       </div>
-      <button class="sound" id="mute" type="button" aria-pressed="false" aria-label="배경음악 끄기"><span class="sound-dot"></span><span class="sound-label">MUSIC ON</span></button>
+      <div class="header-actions">
+        <button class="install" id="install" type="button" aria-label="기기에 게임 설치"><span class="install-icon">⇩</span><span class="install-text">INSTALL</span></button>
+        <button class="sound" id="mute" type="button" aria-pressed="false" aria-label="배경음악 끄기"><span class="sound-dot"></span><span class="sound-label">MUSIC ON</span></button>
+      </div>
     </header>
 
     <section class="layout">
@@ -364,6 +392,13 @@
     $('start').onclick=()=>status==='paused'?pause():start();
     $('pause').onclick=()=>{initAudio();if(status==='ready'||status==='over')start();else pause()};
     $('mute').onclick=()=>{initAudio();setMuted(!muted)};
+
+    let installPrompt=null;
+    const installButton=$('install');
+    addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;installButton.classList.add('available')});
+    installButton.onclick=async()=>{if(!installPrompt){toast('브라우저 메뉴에서 홈 화면에 추가해 주세요');return}installPrompt.prompt();const choice=await installPrompt.userChoice;installPrompt=null;installButton.classList.remove('available');toast(choice.outcome==='accepted'?'설치를 시작합니다':'설치가 취소됐습니다')};
+    addEventListener('appinstalled',()=>{installButton.classList.remove('available');toast('Tetris Nocturne 설치 완료')});
+    if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 
     let touchStart=null;
     const gameFrame=$('gameFrame');

@@ -1,0 +1,27 @@
+{
+  "name": "Tetris Nocturne — Kimkirik Lab",
+  "short_name": "Tetris",
+  "description": "음악과 함께 즐기는 프리미엄 테트리스 게임",
+  "lang": "ko",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#070914",
+  "theme_color": "#070914",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "./icon-install-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
