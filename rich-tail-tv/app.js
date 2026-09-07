@@ -1,4 +1,4 @@
-const videos = [
+const videoCatalog = [
   {id:'9QCKe-lQQOo',title:'들판에서 뛰노는 강아지 친구들',original:'Dog TV for Dogs to Watch — Puppies Playing',channel:'Dog TV 글로벌',category:'dogs',stimulus:'high',duration:'긴 영상',minutes:600,score:99,why:'다른 강아지의 달리기와 자연 소리가 함께 나와 첫 반응 테스트에 좋아요.'},
   {id:'fP40ZgOiT2Q',title:'강아지 친구·짖는 소리·삑삑이 장난감',original:'Ultimate Dog Video — Dog Sounds & Squeak Toy',channel:'Dog TV 글로벌',category:'dogs',stimulus:'high',duration:'장시간',minutes:480,score:98,why:'강아지 모습과 익숙한 놀이 소리가 동시에 나와 고개를 갸웃할 가능성이 높아요.'},
   {id:'6ZuFA-1A7h4',title:'빠르게 뛰고 노는 강아지들',original:'Fast Boredom-Busting Videos for Dogs',channel:'Relax My Dog',category:'dogs',stimulus:'high',duration:'장시간',minutes:720,score:97,why:'빠른 움직임을 따라보는 강아지에게 특히 재미있는 친구멍 영상이에요.'},
@@ -31,7 +31,7 @@ const videos = [
   {id:'OaaKdKW1NnI',title:'혼자 있는 강아지를 위한 편안한 애니',original:'Best Dog TV for Dogs Home Alone',channel:'Dog TV 글로벌',category:'dogs',stimulus:'low',duration:'긴 영상',minutes:600,score:70,why:'잔잔한 음악과 강아지 애니메이션을 섞어 쉬는 시간에 틀기 좋아요.'}
 ];
 
-videos.push(
+videoCatalog.push(
   {id:'EF_c_TQDdJk',title:'짖는 친구와 삑삑이 장난감 놀이',original:'Entertaining Dog Videos — Bark & Squeak Toy',channel:'Doggy Daycare TV',category:'dogs',stimulus:'high',duration:'장시간',minutes:480,score:97,why:'강아지 움직임과 짖는 소리, 삑삑이 소리가 이어져 즉각적인 반응을 끌기 좋아요.'},
   {id:'MfuN5uT6b3I',title:'진짜 강아지들의 산책·놀이·탐색',original:'Real Dogs Barking, Playing & Exploring',channel:'Doggy Woods Retreat',category:'dogs',stimulus:'high',duration:'약 12시간',minutes:720,score:96,why:'실제 강아지가 뛰고 냄새 맡고 짖는 장면을 길게 담아 친구를 만난 듯한 느낌을 줘요.'},
   {id:'FRWUrv0Iiwc',title:'강아지 유치원 하루 종일 보기',original:'Entertaining Doggy Daycare TV',channel:'Doggy Woods Retreat',category:'dogs',stimulus:'high',duration:'약 7시간',minutes:446,score:94,why:'여러 강아지가 함께 움직이는 장면이 많아 사회적인 영상에 반응하는 아이에게 좋아요.'},
@@ -88,7 +88,7 @@ videos.push(
   {id:'bA7Oz6MB13c',title:'파란 수영장에서 공 쫓기',original:'Pool Playtime in Colors Dogs Can See',channel:'Max & Milo TV',category:'ball',stimulus:'high',duration:'약 24시간',minutes:1440,score:76,why:'밝은 파란 수영장과 공의 이동이 선명해 여름철 신나는 영상으로 잘 맞아요.'},
   {id:'S6fc8S18k9o',title:'새끼 강아지를 위한 편안한 만화',original:'Best Dog Cartoon for Puppies Home Alone',channel:'Cartoon for Dog',category:'ball',stimulus:'low',duration:'장시간',minutes:720,score:75,why:'귀여운 강아지 캐릭터와 안정적인 음악을 사용해 어린 강아지도 편하게 볼 수 있어요.'},
   {id:'XFy65xMorA4',title:'가을 테니스공 모험 12시간',original:'Autumn Fun & Tennis Ball Adventures',channel:'Dog TV 글로벌',category:'ball',stimulus:'high',duration:'약 12시간',minutes:720,score:74,why:'가을 공원에서 공을 쫓는 큰 움직임이 길게 이어지는 활동형 만화예요.'},
-  {id:'94qyGEG3j-Y',title:'분리불안 시간용 강아지 색 TV',original:'Anti-Separation Anxiety TV for Dogs',channel:'Cartoon Dog Music',category:'ball',stimulus:'low',duration:'장시간',minutes:720,score:73,why:'파랑·노랑 화면과 편안한 소리를 섞어 보호자가 자리를 비운 시간에 틀기 좋아요.'},
+  {id:'94qyGEG3j-Y',title:'혼자 있는 시간용 강아지 색 TV',original:'Anti-Separation Anxiety TV for Dogs',channel:'Cartoon Dog Music',category:'ball',stimulus:'low',duration:'장시간',minutes:720,score:73,why:'파랑·노랑 화면과 편안한 소리를 섞어 보호자가 자리를 비운 시간에 틀기 좋아요.'},
   {id:'RFgitoAkQQ4',title:'다람쥐와 공을 쫓는 시골길 모험',original:'Squirrel Chase and Ball Play',channel:'Max & Milo TV',category:'ball',stimulus:'high',duration:'약 24시간',minutes:1440,score:72,why:'빠른 다람쥐와 밝은 공이 함께 달려 추적 본능을 자극해요.'},
   {id:'8jDaq1CNRP8',title:'루나와 친구들의 수영장 파티',original:'Pool BBQ Party for Luna and Friends',channel:'Puppy Calm TV',category:'ball',stimulus:'medium',duration:'장시간',minutes:720,score:71,why:'파랑 수영장과 여러 강아지 캐릭터가 부드럽게 움직이는 여유로운 만화예요.'},
   {id:'qDb1FNFeu7g',title:'골든과 코기의 다람쥐 추격전',original:'Golden & Corgi Chase a Squirrel',channel:'Dog TV 글로벌',category:'ball',stimulus:'high',duration:'장시간',minutes:720,score:70,why:'화면 속 강아지 두 마리와 다람쥐, 공놀이까지 한꺼번에 볼 수 있어요.'},
@@ -97,7 +97,7 @@ videos.push(
   {id:'4Br96OA9h7g',title:'자연 소리와 함께 걷는 가상 숲길',original:'Virtual Dog Walk with Nature Sounds',channel:'Harmony Hounds',category:'walk',stimulus:'low',duration:'긴 영상',minutes:480,score:82,why:'사람과 함께 걷는 시점의 숲길과 자연 소리가 차분한 대리 산책 느낌을 줘요.'},
   {id:'2fjKOK76FAs',title:'피아노·새소리·숲소리 휴식',original:'Naturally Calm Piano, Birds & Forest',channel:'Relax My Dog',category:'walk',stimulus:'low',duration:'긴 영상',minutes:600,score:80,why:'부드러운 피아노와 자연 소리가 화면의 숲 풍경과 어우러져 낮잠 전에 좋아요.'},
   {id:'diYi2YbrnLk',title:'안개 낀 영국 숲길 24시간',original:'Foggy Forest Dog Walk TV',channel:'Harmony Hounds',category:'walk',stimulus:'low',duration:'라이브·장시간',minutes:1440,score:78,why:'안개 낀 숲을 천천히 걷는 화면이라 자극에 민감한 강아지에게 편안해요.'},
-  {id:'FXVRJY8pX78',title:'불안 완화를 위한 숲 산책',original:'Forest Walk with Nature Sounds',channel:'Harmony Hounds',category:'walk',stimulus:'low',duration:'긴 영상',minutes:480,score:77,why:'급한 장면 전환 없이 숲길과 새소리를 이어가 차분한 분위기를 만들어요.'},
+  {id:'FXVRJY8pX78',title:'차분하게 보는 숲 산책',original:'Forest Walk with Nature Sounds',channel:'Harmony Hounds',category:'walk',stimulus:'low',duration:'긴 영상',minutes:480,score:77,why:'급한 장면 전환 없이 숲길과 새소리를 이어가 차분한 분위기를 만들어요.'},
   {id:'c3XIme9TsIY',title:'물가를 따라 걷는 가상 산책',original:'Virtual Dog Walk Along the Water',channel:'Harmony Hounds',category:'walk',stimulus:'low',duration:'긴 영상',minutes:480,score:76,why:'물소리와 일정한 걸음 속도가 함께해 편안하게 바라보기 좋은 산책 영상이에요.'},
   {id:'jUljDYovpVU',title:'부드러운 폭포와 자연 휴식',original:'Calm Dog TV with Gentle Waterfalls',channel:'Paul Dinning',category:'walk',stimulus:'low',duration:'약 8시간',minutes:490,score:74,why:'흐르는 물의 반복 움직임과 자연 소리가 긴장을 낮추는 배경이 돼요.'},
   {id:'kHlGUE-VsEc',title:'새와 함께 걷는 6시간 숲길',original:'6 Hour Forest Walk Dog TV',channel:'Daycare for Your Dog',category:'walk',stimulus:'low',duration:'약 6시간',minutes:360,score:73,why:'숲길 산책 중간중간 새가 나타나 잔잔함 속에서도 작은 볼거리를 줘요.'},
@@ -105,8 +105,12 @@ videos.push(
   {id:'nm5-Ci3CqW0',title:'영국 마우스홀 항구 산책',original:'Virtual Dog Walk around Mousehole',channel:'Paul Dinning',category:'walk',stimulus:'medium',duration:'긴 영상',minutes:480,score:71,why:'숲과 다른 항구 풍경, 사람과 새의 움직임을 함께 볼 수 있는 가상 산책이에요.'},
   {id:'9UPgVIqcOzs',title:'기분 전환용 HD 가상 멍TV',original:'HD Virtual Dog TV',channel:'YouTube 글로벌',category:'walk',stimulus:'medium',duration:'긴 영상',minutes:480,score:70,why:'자연과 동물 장면을 적당한 속도로 섞어 짧은 기분 전환용으로 좋아요.'},
   {id:'pDarkh5RJbA',title:'편안한 음악이 흐르는 가상 멍TV',original:'The Best Virtual TV for Dogs',channel:'YouTube 글로벌',category:'walk',stimulus:'low',duration:'긴 영상',minutes:600,score:68,why:'잔잔한 음악과 편안한 자연 화면을 이어 틀어두는 휴식 모드 영상이에요.'},
-  {id:'irjUXgvMBR4',title:'강아지를 편안하게 하는 음악과 화면',original:'Relax My Dog TV with Calming Music',channel:'YouTube 글로벌',category:'walk',stimulus:'low',duration:'긴 영상',minutes:600,score:66,why:'강한 소리나 빠른 장면이 적어 조용한 저녁이나 낮잠 시간에 어울려요.'}
+  {id:'irjUXgvMBR4',title:'편안한 음악과 잔잔한 화면',original:'Relax My Dog TV with Calming Music',channel:'YouTube 글로벌',category:'walk',stimulus:'low',duration:'긴 영상',minutes:600,score:66,why:'강한 소리나 빠른 장면이 적어 조용한 저녁이나 낮잠 시간에 어울려요.'}
 );
+
+// YouTube 소유자가 외부 사이트 재생을 막은 영상은 카드에서 제외한다.
+const blockedEmbedIds=new Set(['YsTodYhSlqQ','-7yzLadUdHA','N4L7egfFnOI','QDY0euyVQLs','hC9r9y29lpA','UYyPPis5a1s','xZJ_v5TlCuM','AijIquoFx8Q','tlPVMZfxNY0','Yf89N9kzSc4']);
+const videos=videoCatalog.filter(video=>!blockedEmbedIds.has(video.id));
 
 const categoryNames={dogs:'친구멍',wildlife:'새·다람쥐',ball:'공·애니',walk:'자연산책',farm:'농장친구',sound:'소리반응'};
 const stimulusNames={high:'신나요',medium:'적당해요',low:'잔잔해요'};
@@ -114,17 +118,31 @@ const stimulusOrder={low:1,medium:2,high:3};
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 const safeParse=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
-let favorites=new Set(safeParse('richDogTvFavorites',[]));
+let favorites=new Set(safeParse('richDogTvFavorites',[]).filter(id=>videos.some(video=>video.id===id)));
 let reactions=safeParse('richDogTvReactions',{});
 let currentId=videos[0].id;
 let currentList=[...videos];
 let favoriteOnly=false;
 let toastTimer;
+let watchTimer;
+let timerRemaining=0;
+let visibleLimit=18;
+const pageSize=18;
+
+function reactionValue(reaction,strong=false){
+  const values=strong?{wag:8,watch:4,ignore:-10}:{wag:3,watch:2,ignore:-4};
+  return values[reaction]||0;
+}
 
 function personalScore(video){
-  const reaction=reactions[video.id];
-  const bonus=reaction==='wag'?8:reaction==='watch'?4:reaction==='ignore'?-8:0;
-  return Math.max(40,Math.min(100,video.score+bonus));
+  let learnedBonus=0;
+  Object.entries(reactions).forEach(([id,reaction])=>{
+    const watched=videos.find(item=>item.id===id);if(!watched)return;
+    if(watched.category===video.category)learnedBonus+=reactionValue(reaction);
+    if(watched.stimulus===video.stimulus)learnedBonus+=Math.round(reactionValue(reaction)/2);
+  });
+  learnedBonus=Math.max(-12,Math.min(12,learnedBonus));
+  return Math.max(40,Math.min(100,video.score+learnedBonus+reactionValue(reactions[video.id],true)));
 }
 
 function saveLocal(){
@@ -157,7 +175,7 @@ function getFilteredVideos(){
 }
 
 function cardTemplate(v,index){
-  const score=$('#sortSelect').value==='rich'?personalScore(v):v.score;
+  const score=personalScore(v);
   return `<article class="video-card ${index<3?'top-three':''}">
     <button class="thumb-button" type="button" data-play="${v.id}" aria-label="${v.title} 재생">
       <span class="rank-badge">${index+1}</span>
@@ -165,20 +183,24 @@ function cardTemplate(v,index){
       <span class="duration-badge">${v.duration}</span>
     </button>
     <div class="card-body">
-      <div class="card-meta"><span class="card-kind">${categoryNames[v.category]}</span><span class="score"><b>${score}</b>% 반응예측</span></div>
-      <h3>${v.title}</h3><p class="channel">${v.channel} · 말소리 거의 없음</p><p class="why">${v.why}</p>
+      <div class="card-meta"><span class="card-kind">${categoryNames[v.category]}</span><span class="score">추천 <b>${score}</b>점</span></div>
+      <h3>${v.title}</h3><p class="channel">YouTube 영상 · 소리는 작게 시작</p><p class="why">${v.why}</p>
       <div class="card-footer"><span class="stimulus" data-level="${v.stimulus}"><i></i>${stimulusNames[v.stimulus]}</span><button class="favorite-button ${favorites.has(v.id)?'active':''}" type="button" data-favorite="${v.id}" aria-label="${favorites.has(v.id)?'찜 해제':'리치찜'}">★</button></div>
     </div>
   </article>`;
 }
 
-function render(){
+function render(resetPage=false){
+  if(resetPage)visibleLimit=pageSize;
   currentList=getFilteredVideos();
-  $('#videoGrid').innerHTML=currentList.map(cardTemplate).join('');
+  const visibleVideos=currentList.slice(0,visibleLimit);
+  $('#videoGrid').innerHTML=visibleVideos.map(cardTemplate).join('');
   $('#resultCount').textContent=currentList.length;
   $('#favoriteCount').textContent=favorites.size;
   $('#emptyState').hidden=currentList.length>0;
   $('#videoGrid').hidden=currentList.length===0;
+  $('#loadMore').hidden=visibleVideos.length>=currentList.length;
+  $('#loadMore').textContent=`영상 더 보기 (${currentList.length-visibleVideos.length}개 남음)`;
   $$('.thumb-button').forEach(btn=>btn.addEventListener('click',()=>playVideo(btn.dataset.play,true)));
   $$('.favorite-button').forEach(btn=>btn.addEventListener('click',()=>toggleFavorite(btn.dataset.favorite)));
 }
@@ -187,14 +209,37 @@ function currentVideo(){return videos.find(v=>v.id===currentId)||videos[0]}
 
 function playVideo(id,scroll=false){
   const v=videos.find(item=>item.id===id);if(!v)return;
+  clearWatchTimer();
   currentId=id;
   $('#screenIdle').hidden=true;
   const frame=$('#videoFrame');frame.hidden=false;
-  frame.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1" title="${v.title}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+  frame.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1" title="${v.title}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="eager"></iframe>`;
   const rank=videos.slice().sort((a,b)=>b.score-a.score).findIndex(item=>item.id===v.id)+1;
-  $('#nowRank').textContent=`NO. ${rank}`;$('#nowKicker').textContent=`${categoryNames[v.category]} · ${stimulusNames[v.stimulus]}`;$('#nowTitle').textContent=v.title;$('#nowWhy').textContent=v.why;$('#youtubeLink').href=`https://www.youtube.com/watch?v=${v.id}`;
+  $('#nowRank').textContent=`추천 ${rank}`;$('#nowKicker').textContent=`${categoryNames[v.category]} · ${stimulusNames[v.stimulus]}`;$('#nowTitle').textContent=v.title;$('#nowWhy').textContent=v.why;$('#youtubeLink').href=`https://www.youtube.com/watch?v=${v.id}`;
+  $('#stopVideo').hidden=false;$('#playerStatus').textContent='재생 중 · 소리는 작게, 리치가 편안한지 살펴보세요.';
   updateReactionButtons();
   if(scroll)document.querySelector('.watch-deck').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function clearWatchTimer(resetLabel=true){
+  clearInterval(watchTimer);watchTimer=null;timerRemaining=0;
+  if(resetLabel)$('#timerButton').textContent='3분 타이머';
+}
+
+function stopPlayback(message='시청을 끝냈어요. 리치의 반응을 남겨 다음 추천에 반영해 보세요.'){
+  clearWatchTimer();$('#videoFrame').replaceChildren();$('#videoFrame').hidden=true;$('#screenIdle').hidden=false;$('#stopVideo').hidden=true;$('#playerStatus').textContent=message;
+}
+
+function updateTimerLabel(){
+  const minutes=Math.floor(timerRemaining/60);const seconds=String(timerRemaining%60).padStart(2,'0');
+  $('#timerButton').textContent=`${minutes}:${seconds} 남음`;
+}
+
+function toggleWatchTimer(){
+  if(watchTimer){clearWatchTimer();$('#playerStatus').textContent='타이머를 해제했어요. 리치가 흥분하면 바로 시청을 끝내 주세요.';return;}
+  if($('#videoFrame').hidden)playVideo(currentId,false);
+  timerRemaining=180;updateTimerLabel();$('#playerStatus').textContent='3분 반응 테스트 중 · 편안하게 보면 계속, 흥분하면 바로 멈춰 주세요.';
+  watchTimer=setInterval(()=>{timerRemaining-=1;updateTimerLabel();if(timerRemaining<=0)stopPlayback('3분 테스트가 끝났어요. 리치의 반응을 선택해 주세요.')},1000);
 }
 
 function stepVideo(direction){
@@ -209,8 +254,8 @@ function updateReactionButtons(){
 }
 
 function recordReaction(reaction){
-  reactions[currentId]=reaction;saveLocal();updateReactionButtons();render();
-  const messages={wag:'꼬리 흔듦 저장! 리치 맞춤 점수가 올라갔어 🐾',watch:'집중해서 봄 저장! 다음 순위에 반영할게.',ignore:'관심 없음 저장! 비슷한 영상 순위를 낮출게.'};
+  reactions[currentId]=reaction;saveLocal();$('#sortSelect').value='rich';updateReactionButtons();render();
+  const messages={wag:'좋아한 종류를 리치 맞춤 추천에 더 반영했어요 🐾',watch:'집중한 종류를 다음 추천에 반영했어요.',ignore:'관심 없는 종류는 다음 추천에서 낮췄어요.'};
   showToast(messages[reaction]);
 }
 
@@ -222,26 +267,32 @@ function toggleFavorite(id){
 function setCategory(category){
   favoriteOnly=false;$('#categorySelect').value=category;
   $$('#categoryChips button').forEach(button=>button.classList.toggle('active',button.dataset.category===category));
-  render();
+  render(true);
 }
 
 function resetAll(){
   favoriteOnly=false;$('#searchInput').value='';$('#categorySelect').value='all';$('#stimulusSelect').value='all';$('#sortSelect').value='score';
-  $$('#categoryChips button').forEach(button=>button.classList.toggle('active',button.dataset.category==='all'));render();
+  $$('#categoryChips button').forEach(button=>button.classList.toggle('active',button.dataset.category==='all'));render(true);
 }
 
-$('#startTest').addEventListener('click',()=>playVideo(videos[0].id,false));
+$('#startTest').addEventListener('click',()=>{
+  const queue=videos.filter(video=>reactions[video.id]!=='ignore').sort((a,b)=>personalScore(b)-personalScore(a));
+  playVideo((queue[0]||videos[0]).id,false);toggleWatchTimer();
+});
 $('#prevVideo').addEventListener('click',()=>stepVideo(-1));
 $('#nextVideo').addEventListener('click',()=>stepVideo(1));
+$('#timerButton').addEventListener('click',toggleWatchTimer);
+$('#stopVideo').addEventListener('click',()=>stopPlayback());
 $('#fullscreenButton').addEventListener('click',async()=>{try{await $('#screenShell').requestFullscreen()}catch{showToast('영상 오른쪽 아래 전체화면 버튼을 눌러줘')}});
 $$('[data-reaction]').forEach(button=>button.addEventListener('click',()=>recordReaction(button.dataset.reaction)));
 $('#guideButton').addEventListener('click',()=>$('#guideDialog').showModal());
-$('#searchInput').addEventListener('input',render);
-$('#stimulusSelect').addEventListener('change',render);
-$('#sortSelect').addEventListener('change',render);
+$('#searchInput').addEventListener('input',()=>render(true));
+$('#stimulusSelect').addEventListener('change',()=>render(true));
+$('#sortSelect').addEventListener('change',()=>render(true));
 $('#categorySelect').addEventListener('change',event=>setCategory(event.target.value));
 $$('#categoryChips button').forEach(button=>button.addEventListener('click',()=>setCategory(button.dataset.category)));
 $('#resetFilters').addEventListener('click',resetAll);
+$('#loadMore').addEventListener('click',()=>{visibleLimit+=pageSize;render()});
 $$('[data-quick]').forEach(button=>button.addEventListener('click',()=>{
   const mode=button.dataset.quick;resetAll();
   if(mode==='excited'){setCategory('ball');$('#stimulusSelect').value='high';$('#sortSelect').value='active'}
@@ -251,9 +302,9 @@ $$('[data-quick]').forEach(button=>button.addEventListener('click',()=>{
 }));
 $$('[data-nav]').forEach(button=>button.addEventListener('click',()=>{
   $$('[data-nav]').forEach(item=>item.classList.remove('active'));button.classList.add('active');
-  if(button.dataset.nav==='home'){favoriteOnly=false;render();document.querySelector('#top').scrollIntoView({behavior:'smooth'})}
-  if(button.dataset.nav==='ranking'){favoriteOnly=false;render();document.querySelector('#ranking').scrollIntoView({behavior:'smooth'})}
-  if(button.dataset.nav==='favorites'){favoriteOnly=true;render();document.querySelector('#ranking').scrollIntoView({behavior:'smooth'});if(!favorites.size)showToast('별표를 누르면 리치찜에 저장돼')}
+  if(button.dataset.nav==='home'){favoriteOnly=false;render(true);document.querySelector('#top').scrollIntoView({behavior:'smooth'})}
+  if(button.dataset.nav==='ranking'){favoriteOnly=false;render(true);document.querySelector('#ranking').scrollIntoView({behavior:'smooth'})}
+  if(button.dataset.nav==='favorites'){favoriteOnly=true;render(true);document.querySelector('#ranking').scrollIntoView({behavior:'smooth'});if(!favorites.size)showToast('별표를 누르면 리치찜에 저장돼')}
 }));
 
 updateReactionButtons();render();

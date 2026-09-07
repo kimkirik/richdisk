@@ -49,7 +49,9 @@ main{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
 .now-copy #nowWhy{font-size:14px;color:#cfe2f8;margin:0}
 .player-actions{display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:8px}
 .player-actions button,.player-actions a{border:1px solid #4c719c;background:#123f72;color:#fff;border-radius:12px;padding:11px 8px;text-align:center;text-decoration:none;font-weight:800;font-size:13px}
-.player-actions a{grid-column:1/-1;background:transparent;color:#bcdcff}
+.player-actions a{background:transparent;color:#bcdcff}
+.player-actions #stopVideo{background:#ffe9a3;color:var(--navy);border-color:var(--yellow)}
+.player-status{margin:-10px 0 0;color:#a9c9e9;font-size:12px;font-weight:700}
 .player-actions button:hover,.player-actions a:hover{border-color:var(--yellow);color:var(--yellow)}
 .reaction-box{border-top:1px solid #315b86;padding-top:18px;margin-top:auto}
 .reaction-box>span{display:block;color:#b9d4ee;font-size:13px;font-weight:800;margin-bottom:10px}
@@ -106,6 +108,9 @@ main{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
 .favorite-button:hover{border-color:var(--blue)}
 .empty-state{text-align:center;background:#fff;border:1px dashed var(--line);border-radius:24px;padding:48px 20px}
 .empty-state>span{font-size:40px}.empty-state h3{margin:8px 0 18px}.empty-state button{border:0;border-radius:999px;background:var(--yellow);color:var(--navy);padding:11px 18px;font-weight:900}
+.load-more{display:block;margin:24px auto 0;border:1px solid var(--navy);border-radius:999px;background:#fff;color:var(--navy);padding:12px 24px;font-weight:900;box-shadow:0 7px 20px rgba(8,45,92,.1)}
+.load-more:hover{background:var(--yellow);border-color:#edc21f}
+.load-more[hidden]{display:none}
 .dog-vision-note{margin-top:58px;border-radius:28px;background:var(--yellow);display:grid;grid-template-columns:270px 1fr;overflow:hidden;align-items:stretch}
 .dog-vision-note>div:last-child{padding:34px 40px}
 .dog-vision-note h2{font-size:30px;letter-spacing:-.04em;line-height:1.15;margin:0 0 10px}.dog-vision-note p{margin:0;max-width:680px}
@@ -123,7 +128,7 @@ dialog::backdrop{background:rgba(2,23,45,.68);backdrop-filter:blur(4px)}
 @media(max-width:620px){
   html{scroll-padding-top:70px}body{padding-bottom:92px}.topbar{height:64px;padding:0 14px}.brand-mark{width:38px;height:38px;font-size:21px}.brand strong{font-size:18px}.brand small{display:none}.key-free{display:none}
   main{padding:14px 12px 32px}.watch-deck{border-radius:22px;margin:0}.screen-shell,.screen-idle{min-height:238px}.idle-copy{inset:auto 18px 21px}.idle-copy h1{font-size:34px}.idle-copy p{display:none}.eyebrow{font-size:10px}.start-button{padding:12px 17px;font-size:14px;box-shadow:0 6px 0 rgba(0,0,0,.22)}
-  .now-panel{display:flex;padding:19px 17px;gap:16px}.now-copy{gap:10px}.now-rank{font-size:10px}.now-copy h2{font-size:19px}.now-copy #nowWhy{font-size:13px}.player-actions{grid-template-columns:1fr 1fr 1fr}.player-actions button{font-size:12px;padding:10px 5px}.reaction-box>div{grid-template-columns:1fr 1fr 1fr}.reaction-box button{font-size:11px;padding:9px 5px;text-align:center}
+  .now-panel{display:flex;padding:19px 17px;gap:16px}.now-copy{gap:10px}.now-rank{font-size:10px}.now-copy h2{font-size:19px}.now-copy #nowWhy{font-size:13px}.player-actions{grid-template-columns:repeat(3,1fr)}.player-actions button,.player-actions a{font-size:11px;padding:10px 5px}.player-status{font-size:11px}.reaction-box>div{grid-template-columns:1fr 1fr 1fr}.reaction-box button{font-size:11px;padding:9px 5px;text-align:center}
   .quick-modes{gap:8px;margin:12px 0 42px}.quick-modes button{padding:12px 8px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;border-radius:16px}.quick-modes button>span{width:38px;height:38px;font-size:20px}.quick-modes strong{font-size:14px}.quick-modes small{display:none}
   .section-heading{align-items:start}.section-heading h2{font-size:32px}.section-heading p{font-size:13px}.count-pill{padding:8px 10px;font-size:11px}.count-pill strong{font-size:15px}
   .filter-panel{grid-template-columns:1fr 1fr;padding:8px;gap:7px;border-radius:17px}.filter-panel label{padding:7px 9px}.filter-panel select,.filter-panel input{font-size:13px}.filter-panel label:nth-child(4){grid-column:1/-1}.category-chips{margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px}

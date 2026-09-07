@@ -7,6 +7,7 @@
   <meta name="description" content="강아지가 좋아할 만한 유튜브 영상을 골라 보여주는 리치 전용 멍TV">
   <title>리치 멍TV — 꼬리가 먼저 고르는 TV</title>
   <link rel="preconnect" href="https://i.ytimg.com">
+  <link rel="preconnect" href="https://www.youtube-nocookie.com">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -28,7 +29,7 @@
           <img src="https://i.ytimg.com/vi/9QCKe-lQQOo/hqdefault.jpg" alt="들판에서 노는 강아지 영상 미리보기">
           <div class="idle-shade"></div>
           <div class="idle-copy">
-            <span class="eyebrow">오늘의 꼬리반응 1위</span>
+            <span class="eyebrow">오늘의 리치 추천 1번</span>
             <h1>리치야, TV 볼까?</h1>
             <p>강아지 친구와 빠른 움직임부터 가볍게 시작해요.</p>
             <button class="start-button" id="startTest" type="button"><span aria-hidden="true">▶</span> 리치 반응 테스트</button>
@@ -39,7 +40,7 @@
 
       <div class="now-panel">
         <div class="now-copy">
-          <div class="now-rank" id="nowRank">NO. 1</div>
+          <div class="now-rank" id="nowRank">추천 1</div>
           <div>
             <p class="now-kicker" id="nowKicker">친구멍 · 신나는 화면</p>
             <h2 id="nowTitle">들판에서 뛰노는 강아지 친구들</h2>
@@ -48,10 +49,13 @@
         </div>
         <div class="player-actions">
           <button type="button" id="prevVideo" aria-label="이전 영상">← 이전</button>
-          <button type="button" id="fullscreenButton">화면 크게</button>
+          <button type="button" id="timerButton">3분 타이머</button>
           <button type="button" id="nextVideo">다음 →</button>
+          <button type="button" id="stopVideo" hidden>■ 시청 끝내기</button>
+          <button type="button" id="fullscreenButton">화면 크게</button>
           <a id="youtubeLink" href="https://www.youtube.com/watch?v=9QCKe-lQQOo" target="_blank" rel="noopener">유튜브에서 열기</a>
         </div>
+        <p class="player-status" id="playerStatus" role="status" aria-live="polite">처음에는 3분만 보고 리치의 반응을 기록해 보세요.</p>
         <div class="reaction-box" id="reactionBox">
           <span>리치 반응은?</span>
           <div>
@@ -72,11 +76,11 @@
     <section class="library" id="ranking" aria-labelledby="rankingTitle">
       <div class="section-heading">
         <div>
-          <span class="eyebrow dark">WORLD DOG TV PICKS</span>
-          <h2 id="rankingTitle">꼬리반응 TOP 100</h2>
-          <p>전 세계 유튜브의 강아지용 영상을 직접 골라 반응 가능성 순으로 정리했어요.</p>
+          <span class="eyebrow dark">PLAYABLE PICKS FOR RICH</span>
+          <h2 id="rankingTitle">리치 추천 영상</h2>
+          <p>사이트 안에서 재생되는 영상만 골랐어요. 반응을 남길수록 리치 취향에 맞춰집니다.</p>
         </div>
-        <div class="count-pill"><strong id="resultCount">100</strong>개 영상</div>
+        <div class="count-pill"><strong id="resultCount">90</strong>개 영상</div>
       </div>
 
       <div class="filter-panel">
@@ -86,7 +90,7 @@
         </label>
         <label><span>볼거리</span><select id="categorySelect"><option value="all">전체</option><option value="dogs">강아지 친구</option><option value="wildlife">새·다람쥐</option><option value="ball">공·애니메이션</option><option value="walk">자연 산책</option><option value="farm">농장 동물</option><option value="sound">소리 반응</option></select></label>
         <label><span>자극 정도</span><select id="stimulusSelect"><option value="all">전체</option><option value="high">신나요</option><option value="medium">적당해요</option><option value="low">잔잔해요</option></select></label>
-        <label><span>정렬</span><select id="sortSelect"><option value="score">꼬리반응 예측순</option><option value="rich">리치 맞춤순</option><option value="calm">잔잔한 순</option><option value="active">신나는 순</option><option value="duration">짧은 순</option></select></label>
+        <label><span>정렬</span><select id="sortSelect"><option value="score">기본 추천순</option><option value="rich">리치 맞춤순</option><option value="calm">잔잔한 순</option><option value="active">신나는 순</option><option value="duration">짧은 순</option></select></label>
       </div>
 
       <div class="category-chips" id="categoryChips" aria-label="영상 종류 빠른 선택">
@@ -100,6 +104,7 @@
       </div>
 
       <div class="video-grid" id="videoGrid" aria-live="polite"></div>
+      <button class="load-more" id="loadMore" type="button" hidden>영상 더 보기</button>
       <div class="empty-state" id="emptyState" hidden><span aria-hidden="true">🐾</span><h3>조건에 맞는 영상이 없어요</h3><button type="button" id="resetFilters">전체 영상 보기</button></div>
     </section>
 
@@ -111,7 +116,7 @@
 
   <nav class="bottom-nav" aria-label="주요 메뉴">
     <button type="button" data-nav="home" class="active"><span aria-hidden="true">⌂</span><small>멍TV</small></button>
-    <button type="button" data-nav="ranking"><span aria-hidden="true">♛</span><small>TOP 100</small></button>
+    <button type="button" data-nav="ranking"><span aria-hidden="true">♛</span><small>추천</small></button>
     <button type="button" data-nav="favorites"><span aria-hidden="true">★</span><small>리치찜</small><b id="favoriteCount">0</b></button>
   </nav>
 
