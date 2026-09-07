@@ -1,0 +1,1 @@
+Run npm ci in this directory once, then run node scripts/build-frontend.mjs from the project root to compile and copy the frontend assets. Run npm run build at the root to package the Sites server. Notice data and push API use the public app origin. INDEPENDENT_API_URL can point to the user-owned Cloudflare Workers server; no GitHub resources are fetched at runtime.

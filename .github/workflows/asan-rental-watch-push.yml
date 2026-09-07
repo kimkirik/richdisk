@@ -1,16 +1,11 @@
-name: Asan app push delivery and health check
+name: Asan notification source backup only
 on:
-  schedule:
-    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch:
-permissions: {}
-concurrency:
-  group: asan-app-push
-  cancel-in-progress: false
+permissions:
+  contents: read
 jobs:
-  deliver:
+  backup-info:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
-      - name: Deliver pending app notifications and check source freshness
-        run: curl --fail-with-body --retry 2 --max-time 120 --request POST https://asan-rental-push.kimkirik.chatgpt.site/api/tick
+      - name: No notification scheduling in GitHub
+        run: echo 'App notifications are scheduled by Cloudflare Durable Object Alarms. GitHub is backup only.'

@@ -49,11 +49,11 @@ test('source recovery cancels queued outage warnings without losing notice histo
   const { db, env } = fixture(), oldFetch = globalThis.fetch;
   const current = { ...snapshot, checkedAt: new Date().toISOString(), notices: [{ id: 'active', title: '아산 수시모집' }] };
   try {
-    globalThis.fetch = async () => Response.json({ ...current, healthySourceCount: 4 });
+    db.prepare('INSERT INTO state(key,value) VALUES(?,?)').run('snapshot', JSON.stringify({ ...current, healthySourceCount: 4 }));
     await tick(env);
     assert.equal(db.prepare("SELECT count(*) AS n FROM events WHERE id LIKE 'health:%' AND expires_at>?").get(Date.now())!.n, 1);
     db.prepare("UPDATE state SET value='0' WHERE key='tick-lock'").run();
-    globalThis.fetch = async () => Response.json(current);
+    db.prepare('UPDATE state SET value=? WHERE key=?').run(JSON.stringify(current), 'snapshot');
     await tick(env);
     assert.equal(db.prepare("SELECT count(*) AS n FROM events WHERE id LIKE 'health:%' AND expires_at>?").get(Date.now())!.n, 0);
     assert.match(String(db.prepare("SELECT value FROM state WHERE key='known'").get()!.value), /active/);

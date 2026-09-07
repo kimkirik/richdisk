@@ -1,0 +1,45 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "asan-rental-watch",
+  "main": "server/worker.ts",
+  "compatibility_date": "2026-05-15",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./static",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*",
+      "/data/*"
+    ]
+  },
+  "vars": {
+    "VAPID_PUBLIC_KEY": "BLAV5gwm6Y96QgfGbtYUZeg-ylQMiWu-x_3nB-6FQ1xLMvDwEhVAtteM0-6kecmZbULwdxZDE7W-COp260BtcSo",
+    "APP_URL": "https://asan-rental-push.kimkirik.chatgpt.site/"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WATCH",
+        "class_name": "RentalWatch"
+      },
+      {
+        "name": "SCANNERS",
+        "class_name": "SourceScanner"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "RentalWatch",
+        "SourceScanner"
+      ]
+    }
+  ],
+  "account_id": "2536f97e5987f3fb6cd0bd70922f4b40"
+}

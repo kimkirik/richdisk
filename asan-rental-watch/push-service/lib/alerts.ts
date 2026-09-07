@@ -1,7 +1,7 @@
 export type Notice = { id: string; title: string; alertKey?: string; status?: string; archivedAt?: string; needsVerification?: boolean; applicationStartAt?: string; applicationEndAt?: string; closeAt?: string };
 export type Snapshot = { checkedAt: string; notices: Notice[]; healthySourceCount: number; sourceCount: number };
 export type Alert = { id: string; title: string; body: string; createdAt: number; expiresAt: number; audience?: string };
-export const APP_URL = 'https://kimkirik.github.io/richdisk/asan-rental-watch/';
+export const APP_URL = 'https://asan-rental-push.kimkirik.chatgpt.site/';
 export const day = (time: number) => new Date(time + 9 * 3600000).toISOString().slice(0, 10);
 export const endTime = (n: Notice) => n.applicationEndAt ? Date.parse(n.applicationEndAt) : n.closeAt ? Date.parse(n.closeAt + 'T23:59:59.999+09:00') : Infinity;
 export function validSnapshot(value: unknown): value is Snapshot {

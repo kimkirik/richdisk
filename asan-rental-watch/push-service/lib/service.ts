@@ -1,9 +1,10 @@
 import { buildPushPayload, type PushSubscription } from '@block65/webcrypto-web-push';
 import { APP_URL, buildAlerts, validSnapshot, day, type Alert } from './alerts.ts';
-export type Bindings = { DB: D1Database; VAPID_PUBLIC_KEY: string; VAPID_PRIVATE_KEY: string };
+export type Bindings = { INDEPENDENT_API_URL?: string; DB: D1Database; VAPID_PUBLIC_KEY: string; VAPID_PRIVATE_KEY: string };
 type Device = { id: string; token_hash: string; subscription: string };
 type EventRow = { id: string; title: string; body: string; expires_at: number };
-const UPSTREAM = 'https://raw.githubusercontent.com/kimkirik/richdisk/main/asan-rental-watch/data/notices.json';
+import seed from './seed.json' with { type: 'json' };
+import { collect } from './collector.ts';
 const bytes = (value: string) => new TextEncoder().encode(value);
 export async function hash(value: string) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes(value)))].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -16,7 +17,7 @@ export async function getState(env: Bindings, key: string) {
   const row = await env.DB.prepare('SELECT value FROM state WHERE key=?').bind(key).first<{ value: string }>();
   return row ? JSON.parse(row.value) : null;
 }
-async function setState(env: Bindings, key: string, value: unknown) {
+export async function setState(env: Bindings, key: string, value: unknown) {
   await env.DB.prepare('INSERT INTO state(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key, JSON.stringify(value)).run();
 }
 export async function throttle(env: Bindings, key: string, interval: number) {
@@ -75,9 +76,7 @@ export async function tick(env: Bindings) {
   const now = Date.now();
   let health: Record<string, unknown>;
   try {
-    const response = await fetch(UPSTREAM + '?t=' + now, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
-    if (!response.ok) throw new Error('upstream-http');
-    const snapshot = await response.json();
+    const snapshot = await getState(env, 'snapshot') || seed;
     if (!validSnapshot(snapshot) || Date.parse(snapshot.checkedAt) > now + 300000) throw new Error('invalid-data');
     const stale = now - Date.parse(snapshot.checkedAt) > 90 * 60000;
     health = { checkedAt: new Date(now).toISOString(), dataCheckedAt: snapshot.checkedAt, stale, healthySourceCount: snapshot.healthySourceCount, sourceCount: snapshot.sourceCount };
@@ -109,4 +108,14 @@ export async function tick(env: Bindings) {
   }
   await setState(env, 'lastDelivery', { at: new Date().toISOString(), ...counts });
   return { status: 'checked', ...health, delivery: counts };
+}
+
+export async function currentSnapshot(env: Bindings) { return await getState(env, 'snapshot') || seed; }
+export async function refreshOfficialSources(env: Bindings) {
+  if (!await throttle(env, 'source-refresh-lock', 15 * 60000)) return { status: 'already-checking' };
+  const previous = await currentSnapshot(env);
+  const snapshot = await collect(previous);
+  await setState(env, 'snapshot', snapshot);
+  const delivery = await tick(env);
+  return { status: 'checked', checkedAt: snapshot.checkedAt, healthySourceCount: snapshot.healthySourceCount, sourceCount: snapshot.sourceCount, delivery };
 }
