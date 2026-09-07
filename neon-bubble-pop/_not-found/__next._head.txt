@@ -1,0 +1,6 @@
+1:"$Sreact.fragment"
+2:I[97367,["/richdisk/neon-bubble-pop/_next/static/chunks/0dbhjjzl8qfwv.js"],"ViewportBoundary"]
+3:I[97367,["/richdisk/neon-bubble-pop/_next/static/chunks/0dbhjjzl8qfwv.js"],"MetadataBoundary"]
+4:"$Sreact.suspense"
+5:I[27201,["/richdisk/neon-bubble-pop/_next/static/chunks/0dbhjjzl8qfwv.js"],"IconMark"]
+0:{"rsc":["$","$1","h",{"children":[["$","meta",null,{"name":"robots","content":"noindex"}],["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"버블 팝! | 네온 아케이드"}],["$","meta","1",{"name":"description","content":"빛나는 버블을 조준해 콤보를 터뜨리는 네온 버블 슈터 게임"}],["$","link","2",{"rel":"shortcut icon","href":"/richdisk/neon-bubble-pop/favicon.svg"}],["$","link","3",{"rel":"icon","href":"/richdisk/neon-bubble-pop/favicon.svg"}],["$","$L5","4",{}]]}]}]}],null]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"H7hSlfPEf0JYA6wJz5MPv"}

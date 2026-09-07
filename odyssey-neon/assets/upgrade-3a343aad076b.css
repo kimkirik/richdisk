@@ -1,0 +1,80 @@
+/* Keep the same 5:6 playfield on desktop, phone, and tablet. */
+:root { --board-width: min(100%, calc((100dvh - 250px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 5 / 6)); }
+html, body { min-height: 100%; overscroll-behavior: none; }
+.shell { min-height: 100dvh; padding: max(8px, env(safe-area-inset-top)) 12px max(8px, env(safe-area-inset-bottom)); grid-template-columns: minmax(0, 560px) 240px; gap: 24px; align-items: start; }
+.game-wrap { width: 100%; display: flex; flex-direction: column; align-items: center; }
+.game-wrap > header, .hud, .safe { width: 100%; }
+header { min-height: 54px; padding: 4px 4px 8px; align-items: center; gap: 8px; }
+h1 { font-size: 30px; white-space: nowrap; }
+.top-actions { gap: 5px; }
+.top-actions button { width: 36px; height: 36px; }
+.screen { width: var(--board-width); max-height: none; aspect-ratio: 5 / 6; flex-shrink: 0; }
+.hud { min-height: 36px; padding: 7px 4px; font-size: 11px; }
+.hud b { display: block; text-align: center; }
+.hud i { display: block; }
+.safe { min-height: 112px; gap: 7px; grid-template-columns: 1fr 1fr; padding: 8px 10px; }
+.combat-status { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 8px; font: 12px/1.4 sans-serif; color: #a9c5dc; }
+.combat-status b { color: #ffd86a; white-space: nowrap; }
+.combat-status span { text-align: right; }
+.mobile-controls { grid-column: 1 / -1; order: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mobile-controls button { min-width: 0; min-height: 42px; padding: 6px 8px; font-size: 18px; display: flex; gap: 8px; align-items: center; justify-content: center; }
+.mobile-controls span { font-size: 13px; margin: 0; }
+.meters { grid-column: 1 / -1; gap: 16px; }
+.meter span { font-size: 10px; }
+.meter > div { margin-top: 3px; }
+.legend { display: none; }
+.weapon-button.rocket { color: #ffc1a4; border-color: #ff9457 !important; }
+.weapon-button.homing { color: #d2ffbe; border-color: #a9ff8c !important; }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.start-hint { max-width: 86%; color: #a6d8eb; font: 13px/1.6 sans-serif; margin: -6px 0 20px; text-align: center; text-wrap: balance; }
+.intro { padding: 14px; overflow-y: auto; }
+.intro .orbit { width: 70px; height: 70px; font-size: 40px; margin-bottom: 12px; flex-shrink: 0; }
+.intro h2 { font-size: clamp(32px, 6vh, 58px); }
+.intro > p { margin: 8px 0 18px; }
+.intro > button { font-size: 16px; padding: 12px 24px; }
+.intro > small { font-size: 11px; }
+.nickname-field { margin-bottom: 12px; }
+.nickname-field input { padding: 10px 12px; font-size: 16px; }
+.panel > div { width: 94%; max-height: 94%; padding: 20px 16px; }
+.helpgrid { font: 13px/1.6 sans-serif; gap: 9px; }
+.helpgrid b { white-space: nowrap; }
+.weapon-guide { padding-top: 12px; font: 13px/1.6 sans-serif; }
+.weapon-guide p { display: grid; gap: 3px; margin: 8px 0; }
+.weapon-guide span { color: #adc4d9; }
+.itemhelp p { grid-template-columns: 25px 70px 1fr; font: 12px/1.5 sans-serif; }
+aside { padding-top: 84px; }
+@media (max-width: 850px) {
+  .shell { width: min(100%, 660px); display: block; padding-inline: max(6px, env(safe-area-inset-left)); }
+  aside { display: none; }
+  .eyebrow { display: none; }
+  h1 { font-size: 26px; }
+  .top-actions button { width: 34px; height: 36px; }
+}
+@media (max-height: 700px) and (min-width: 600px) {
+  :root { --board-width: min(100%, calc((100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 5 / 6)); }
+  .shell { display: block; width: 100%; max-width: 1100px; margin: auto; }
+  .game-wrap { position: relative; min-height: calc(100dvh - 16px); align-items: flex-start; padding-right: 250px; }
+  .screen { margin: 0 auto; order: -1; }
+  .game-wrap > header, .hud, .safe { position: absolute; right: 0; width: 238px; }
+  .game-wrap > header { top: 4px; flex-wrap: wrap; }
+  .hud { top: 92px; }
+  .safe { top: 143px; }
+  .combat-status { display: grid; }
+  .combat-status span { text-align: left; }
+  .mobile-controls { grid-template-columns: 1fr; }
+  aside { display: none; }
+  .intro .orbit, .intro > small { display: none; }
+  .intro h2 { font-size: 32px; }
+  .intro > p { margin: 6px 0 10px; }
+  .start-hint { font-size: 11px; margin: 0 0 10px; }
+  .nickname-field span { display: none; }
+}
+@media (max-width: 380px) {
+  h1 { font-size: 23px; }
+  h1 small { display: none; }
+  .combat-status, .mobile-controls span { font-size: 11px; }
+  .intro .orbit { display: none; }
+  .intro > p { margin: 6px 0 12px; }
+  .start-hint { font-size: 11px; margin: 0 0 12px; }
+}

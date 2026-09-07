@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="재난에 대비해요 번개 아이콘">
+  <defs><radialGradient id="g"><stop stop-color="#18282b"/><stop offset="1" stop-color="#071013"/></radialGradient><filter id="s"><feGaussianBlur stdDeviation="5"/></filter></defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#g)" stroke="#31484b" stroke-width="4"/>
+  <circle cx="64" cy="64" r="42" fill="none" stroke="#d9ff3f" stroke-opacity=".2" stroke-width="2"/>
+  <path d="M73 16 39 69h23l-8 44 35-60H66z" fill="#d9ff3f" opacity=".45" filter="url(#s)"/>
+  <path d="M74 14 39 69h24l-9 45 36-62H66z" fill="#d9ff3f" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M19 64h14m62 0h14M64 19v9m0 72v9" stroke="#ef5538" stroke-width="3" stroke-linecap="round"/>
+</svg>

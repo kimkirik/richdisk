@@ -1,0 +1,11 @@
+{
+  "name":"닮은소리",
+  "short_name":"닮은소리",
+  "description":"음악 취향 분석과 닮은 음악 추천",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#090518",
+  "theme_color":"#090518",
+  "icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

@@ -1,0 +1,36 @@
+name: Verify Asan rental watch
+on:
+  pull_request:
+    paths: ['asan-rental-watch/**', '.github/workflows/asan-rental-watch-*.yml']
+  push:
+    branches: ['main']
+    paths: ['asan-rental-watch/push-service/**', 'asan-rental-watch/source/**', 'asan-rental-watch/scripts/**', 'asan-rental-watch/tests/**', '.github/workflows/asan-rental-watch-*.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: asan-rental-watch/source/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: asan-rental-watch/source
+      - run: npm test && npm run typecheck && npm run build
+        working-directory: asan-rental-watch/source
+  verify-push-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: asan-rental-watch/push-service/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: asan-rental-watch/push-service
+      - run: npm test && npm run typecheck && npm run build
+        working-directory: asan-rental-watch/push-service

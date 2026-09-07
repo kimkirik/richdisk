@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#030308" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="네온 발바닥" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="description"
+      content="반려동물이 태블릿을 터치할 때마다 녹음한 보호자 목소리와 네온 발바닥이 나타나는 놀이 앱"
+    />
+    <title>톡톡! 네온 발바닥</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="./icons/paw-192.png" sizes="192x192" type="image/png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="welcome-screen" class="welcome-screen">
+      <div class="welcome-glow welcome-glow-pink" aria-hidden="true"></div>
+      <div class="welcome-glow welcome-glow-blue" aria-hidden="true"></div>
+
+      <section class="welcome-card" aria-labelledby="main-title">
+        <div class="eyebrow" aria-hidden="true">
+          <span class="eyebrow-dot"></span>
+          NEON PAW PLAY
+          <span class="eyebrow-dot"></span>
+        </div>
+        <h1 id="main-title">톡톡! <span>네온 발바닥</span></h1>
+        <p class="subtitle">이름을 부르면 더 신나는 우리 친구의 태블릿 놀이터</p>
+
+        <form id="setup-form" class="name-entry" novalidate>
+          <label for="pet-name">1. 친구의 이름을 입력하세요</label>
+          <p>이름을 입력한 다음 보호자의 목소리를 녹음해요</p>
+
+          <div class="name-input-shell">
+            <span class="name-paw" aria-hidden="true">🐾</span>
+            <input
+              id="pet-name"
+              class="name-input"
+              type="text"
+              maxlength="12"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              inputmode="text"
+              placeholder="예: 리치"
+              aria-describedby="name-guide"
+            />
+            <span id="input-count" class="input-count" aria-hidden="true">0/12</span>
+          </div>
+
+          <div id="name-guide" class="voice-example">
+            <span aria-hidden="true">♪</span>
+            <span id="voice-guide">먼저 이름을 입력해 주세요</span>
+          </div>
+
+          <section id="recorder-card" class="recorder-card idle" aria-labelledby="recorder-title">
+            <div class="recorder-copy">
+              <span class="recorder-step" aria-hidden="true">2</span>
+              <div>
+                <strong id="recorder-title">보호자 목소리 녹음</strong>
+                <small id="recorder-status">버튼을 누르고 이름을 한 번 불러주세요</small>
+              </div>
+            </div>
+
+            <button id="record-button" class="record-button" type="button" disabled>
+              <span class="record-dot" aria-hidden="true"></span>
+              <span id="record-button-label">목소리 녹음하기</span>
+            </button>
+
+            <div id="recording-wave" class="recording-wave hidden" aria-live="polite">
+              <i></i><i></i><i></i><i></i><i></i><i></i>
+              <span id="wave-label"></span>
+            </div>
+
+            <button id="listen-button" class="listen-button hidden" type="button">
+              ▶ 녹음 들어보기
+            </button>
+
+            <p id="recording-error" class="recording-error hidden" role="alert"></p>
+            <p class="recorder-privacy">🔒 녹음은 이 기기에서만 사용되며 서버로 전송되지 않아요</p>
+          </section>
+
+          <button id="start-button" class="start-button" type="submit" disabled>
+            <span>START</span>
+            <i aria-hidden="true">▶</i>
+          </button>
+          <p id="start-help" class="start-help" aria-live="polite">이름을 입력하면 녹음할 수 있어요</p>
+
+          <button id="install-button" class="install-button hidden" type="button">
+            <span aria-hidden="true">↓</span>
+            태블릿에 앱 설치
+          </button>
+        </form>
+      </section>
+
+      <footer class="safety-note">
+        <span>✦</span> 보호자와 함께, 태블릿을 안전하게 고정하고 짧게 놀아주세요 <span>✦</span>
+      </footer>
+    </main>
+
+    <main
+      id="play-screen"
+      class="play-screen hidden"
+      aria-label="네온 발바닥 놀이 화면"
+    >
+      <div class="ambient ambient-one" aria-hidden="true"></div>
+      <div class="ambient ambient-two" aria-hidden="true"></div>
+
+      <header class="play-header">
+        <div id="mode-chip" class="mode-chip" aria-label="놀이 중">
+          <span aria-hidden="true">🐾</span>
+          <span id="playing-name">놀이 중</span>
+        </div>
+        <div class="play-actions">
+          <button
+            id="sound-button"
+            class="sound-button"
+            type="button"
+            data-control
+            aria-pressed="true"
+            aria-label="음성 끄기"
+          >
+            <span aria-hidden="true">🔊</span>
+            <b>음성 켜짐</b>
+          </button>
+          <button
+            id="exit-button"
+            class="exit-button"
+            type="button"
+            data-control
+            aria-label="나가기, 2초 동안 길게 누르기"
+          >
+            <span>길게 눌러 나가기</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="play-hint" class="play-hint" aria-hidden="true">
+        <div class="mini-paw">
+          <i class="toe toe-1"></i><i class="toe toe-2"></i>
+          <i class="toe toe-3"></i><i class="toe toe-4"></i>
+          <i class="pad"></i>
+        </div>
+        <strong>발로 화면을 톡톡!</strong>
+        <span id="play-hint-copy">누를 때마다 녹음한 목소리가 나와요</span>
+      </div>
+
+      <div id="stamp-layer" class="stamp-layer" aria-hidden="true"></div>
+      <p class="guardian-tip" aria-hidden="true">보호자 메뉴는 화면 위쪽에 있어요</p>
+    </main>
+
+    <template id="stamp-template">
+      <div class="neon-impact">
+        <span class="ripple ripple-one"></span>
+        <span class="ripple ripple-two"></span>
+        <span class="spark spark-1"></span><span class="spark spark-2"></span>
+        <span class="spark spark-3"></span><span class="spark spark-4"></span>
+        <span class="stamp-sound"></span>
+        <div class="paw-shape">
+          <i class="toe toe-1"></i><i class="toe toe-2"></i>
+          <i class="toe toe-3"></i><i class="toe toe-4"></i>
+          <i class="pad"></i>
+        </div>
+      </div>
+    </template>
+
+    <noscript>이 앱은 JavaScript를 켜야 사용할 수 있어요.</noscript>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "충격파 · 글로벌 충격 트래커",
+  "short_name": "충격파",
+  "id": "./",
+  "description": "세계 사건과 시장 반응, 금·BTC 매수 후보와 현금방어 경보를 함께 확인합니다.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#071015",
+  "theme_color": "#071015",
+  "icons": [
+    {
+      "src": "./shockwave-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./shockwave-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

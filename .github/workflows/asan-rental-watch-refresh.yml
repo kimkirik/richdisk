@@ -1,0 +1,75 @@
+name: Refresh Asan rental notices
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/asan-rental-watch-refresh.yml"
+      - "asan-rental-watch/scripts/**"
+      - "asan-rental-watch/source/lib/notices.ts"
+      - "asan-rental-watch/tests/**"
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: asan-rental-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check official rental sources
+        run: node --experimental-strip-types asan-rental-watch/scripts/update-notices.ts
+
+      - name: Test notice lifecycle and notification delivery logic
+        run: node --experimental-strip-types --test asan-rental-watch/tests/*.test.*
+
+      - name: Save refreshed notice archive
+        run: |
+          git config user.name "asan-rental-watch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add asan-rental-watch/data/notices.json
+          if ! git diff --cached --quiet; then
+            git commit -m "data: refresh Asan rental notices"
+            git pull --rebase
+            git push
+          fi
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Deliver app push notifications
+        if: always()
+        run: curl --fail-with-body --retry 2 --max-time 120 --request POST https://asan-rental-push.kimkirik.chatgpt.site/api/tick
+
+      - name: Report incomplete official-source checks
+        run: |
+          node -e 'const fs = require("node:fs"); const data = JSON.parse(fs.readFileSync("asan-rental-watch/data/notices.json", "utf8")); const failed = Object.entries(data.sourceHealth).filter(([, ok]) => !ok).map(([name]) => name); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "Checked at: " + data.checkedAt + "\n\nActive: " + data.notices.length + " | Archived: " + data.archived.length + "\n\nFailed sources: " + (failed.join(", ") || "none") + "\n"); if (failed.length) { console.error("Incomplete source coverage: " + failed.join(", ")); process.exitCode = 1; }'
