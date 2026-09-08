@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#25113f">
+  <meta name="description" content="새, 다람쥐, 물고기와 작은 움직임을 골라 보여주는 고양이 전용 냥이TV">
+  <title>냥이TV — 수염이 먼저 고르는 채널</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://i.ytimg.com">
+  <link rel="preconnect" href="https://www.youtube-nocookie.com">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#ranking">냥이 영상 목록으로 바로가기</a>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="냥이TV 처음으로">
+      <span class="brand-mark" aria-hidden="true">🐱</span>
+      <span><strong>냥이TV</strong><small>수염이 먼저 고르는 채널</small></span>
+    </a>
+    <div class="header-actions">
+      <span class="studio-status"><i aria-hidden="true"></i> CAT'S WINDOW</span>
+      <button class="header-favorites" id="headerFavorites" type="button"><span aria-hidden="true">♥</span> 냥이찜 <b id="desktopFavoriteCount">0</b></button>
+      <button class="icon-button" id="guideButton" type="button" aria-label="고양이 시청 안내">?</button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="watch-deck" aria-labelledby="nowTitle">
+      <div class="screen-shell" id="screenShell">
+        <div class="screen-livebar" aria-hidden="true"><span>CAT TV</span><span>A WINDOW FOR CURIOUS CATS</span></div>
+        <div class="screen-idle" id="screenIdle">
+          <img id="idleImage" src="https://i.ytimg.com/vi/B-FR23hswfQ/hqdefault.jpg" alt="풀밭의 새와 다람쥐 영상 미리보기">
+          <div class="idle-shade"></div>
+          <div class="idle-copy">
+            <span class="eyebrow" id="idleEyebrow">오늘의 냥이 추천 1번</span>
+            <h1 id="idleTitle">창밖 구경할까?</h1>
+            <p id="idleDescription">새와 다람쥐가 오가는 작은 자연 창문을 열어드려요.</p>
+            <button class="start-button" id="startTest" type="button"><span aria-hidden="true">▶</span> 3분 냥이 테스트</button>
+          </div>
+        </div>
+        <div class="video-frame" id="videoFrame" hidden></div>
+      </div>
+
+      <div class="now-panel">
+        <div class="now-label"><span aria-hidden="true"></span> NOW ON CAT TV</div>
+        <div class="now-copy">
+          <div class="now-rank" id="nowRank">추천 1</div>
+          <div>
+            <p class="now-kicker" id="nowKicker">새·다람쥐 · 호기심 톡톡</p>
+            <h2 id="nowTitle">풀밭에 찾아온 작은 친구들</h2>
+            <p id="nowWhy">새의 날갯짓과 다람쥐의 빠른 움직임을 한 화면에서 오래 관찰해요.</p>
+          </div>
+        </div>
+        <div class="player-actions">
+          <button type="button" id="prevVideo" aria-label="이전 영상">← 이전</button>
+          <button type="button" id="timerButton">3분 타이머</button>
+          <button type="button" id="nextVideo">다음 →</button>
+          <button type="button" id="surpriseButton">✦ 냥이 픽</button>
+          <button type="button" id="stopVideo" hidden>■ 시청 끝내기</button>
+          <button type="button" id="fullscreenButton">화면 크게</button>
+          <a id="youtubeLink" href="https://www.youtube.com/watch?v=B-FR23hswfQ" target="_blank" rel="noopener">유튜브에서 열기</a>
+        </div>
+        <p class="player-status" id="playerStatus" role="status" aria-live="polite">처음에는 3분만 보고 냥이의 반응을 기록해 보세요.</p>
+        <div class="reaction-box" id="reactionBox">
+          <span>냥이 반응은?</span>
+          <div>
+            <button type="button" data-reaction="pounce" aria-pressed="false">⚡ 앞발이 움찔</button>
+            <button type="button" data-reaction="watch" aria-pressed="false">◉ 눈을 못 뗌</button>
+            <button type="button" data-reaction="ignore" aria-pressed="false">― 관심 없음</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="quick-modes" aria-label="빠른 시청 모드">
+      <button type="button" data-quick="hunt"><span aria-hidden="true">🐭</span><strong>사냥 본능</strong><small>빠른 움직임 바로 재생</small><b aria-hidden="true">▶</b></button>
+      <button type="button" data-quick="window"><span aria-hidden="true">🐦</span><strong>창밖 구경</strong><small>새·다람쥐 바로 재생</small><b aria-hidden="true">▶</b></button>
+      <button type="button" data-quick="aquarium"><span aria-hidden="true">🐠</span><strong>물멍 냥</strong><small>물고기 바로 재생</small><b aria-hidden="true">▶</b></button>
+      <button class="quick-surprise" type="button" data-quick="surprise"><span aria-hidden="true">✨</span><strong>냥이가 골라줘</strong><small>안 본 영상 깜짝 재생</small><b aria-hidden="true">?</b></button>
+    </section>
+
+    <section class="library" id="ranking" aria-labelledby="rankingTitle">
+      <div class="section-heading">
+        <div>
+          <span class="section-index" aria-hidden="true">01</span><span class="eyebrow dark">CURATED FOR CURIOUS CATS</span>
+          <h2 id="rankingTitle">냥이 추천 영상</h2>
+          <p>작고 자연스러운 움직임을 골랐어요. 반응을 남길수록 냥이 취향에 맞춰집니다.</p>
+        </div>
+        <div class="count-pill"><strong id="resultCount">90</strong>개 영상</div>
+      </div>
+
+      <div class="filter-panel">
+        <label class="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="searchInput" type="search" placeholder="새, 물고기, 다람쥐 검색" aria-label="냥이 영상 검색" autocomplete="off">
+        </label>
+        <label><span>볼거리</span><select id="categorySelect"><option value="all">전체</option><option value="birds">새 구경</option><option value="squirrels">다람쥐·토끼</option><option value="fish">물고기</option><option value="mice">쥐·작은 사냥감</option><option value="calm">편안한 자연</option></select></label>
+        <label><span>자극 정도</span><select id="stimulusSelect"><option value="all">전체</option><option value="high">사냥 본능</option><option value="medium">호기심 톡톡</option><option value="low">느긋하게</option></select></label>
+        <label><span>정렬</span><select id="sortSelect"><option value="score">기본 추천순</option><option value="cat">냥이 맞춤순</option><option value="calm">느긋한 순</option><option value="active">활발한 순</option><option value="duration">짧은 순</option></select></label>
+      </div>
+
+      <div class="category-chips" id="categoryChips" aria-label="영상 종류 빠른 선택">
+        <button class="active" type="button" data-category="all" aria-pressed="true">전체</button>
+        <button type="button" data-category="birds">🐦 새 구경</button>
+        <button type="button" data-category="squirrels">🐿️ 다람쥐</button>
+        <button type="button" data-category="fish">🐠 물고기</button>
+        <button type="button" data-category="mice">🐭 쥐·사냥감</button>
+        <button type="button" data-category="calm">🌿 편안한 자연</button>
+      </div>
+
+      <div class="filter-summary" id="filterSummary" role="status" aria-live="polite">전체 영상 · 기본 추천순</div>
+
+      <div class="video-grid" id="videoGrid"></div>
+      <button class="load-more" id="loadMore" type="button" hidden>영상 더 보기</button>
+      <div class="empty-state" id="emptyState" hidden><span aria-hidden="true">🐾</span><h3>조건에 맞는 영상이 없어요</h3><button type="button" id="resetFilters">전체 영상 보기</button></div>
+    </section>
+
+    <section class="dog-vision-note">
+      <div class="vision-swatches" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div><span class="eyebrow dark">CAT-FRIENDLY WINDOW</span><h2>작은 움직임은 또렷하게, 화면은 편안하게</h2><p>고양이가 오래 바라볼 수 있도록 작은 동물의 자연스러운 움직임과 선명한 대비를 중심으로 골랐어요. 갑자기 번쩍이는 효과는 넣지 않았습니다.</p></div>
+    </section>
+
+    <footer class="site-footer">
+      <span class="footer-mark" aria-hidden="true">🐾</span>
+      <div><strong>냥이TV</strong><p>반응을 살피며 짧고 즐겁게. 실제 사냥놀이와 교감을 대신하지 않아요.</p></div>
+      <button type="button" id="footerGuideButton">안전 시청 가이드</button>
+    </footer>
+  </main>
+
+  <nav class="bottom-nav" aria-label="주요 메뉴">
+    <button type="button" data-nav="home" class="active"><span aria-hidden="true">⌂</span><small>냥이TV</small></button>
+    <button type="button" data-nav="ranking"><span aria-hidden="true">♛</span><small>추천</small></button>
+    <button type="button" data-nav="favorites"><span aria-hidden="true">♥</span><small>냥이찜</small><b id="favoriteCount">0</b></button>
+  </nav>
+
+  <dialog id="guideDialog">
+    <form method="dialog" class="dialog-card">
+      <button class="dialog-close" aria-label="닫기">×</button>
+      <span class="dialog-icon" aria-hidden="true">🐱</span>
+      <h2>냥이와 안전하게 보기</h2>
+      <ol>
+        <li><strong>소리는 작게 시작</strong><span>새소리나 쥐 소리에 과하게 흥분하지 않는지 살펴봐요.</span></li>
+        <li><strong>처음엔 1~5분만</strong><span>동공이 커지고 화면에 달려들면 잠시 쉬어 주세요.</span></li>
+        <li><strong>TV는 단단히 고정</strong><span>화면을 잡거나 뒤쪽을 확인하려 할 수 있어요.</span></li>
+        <li><strong>낚싯대 놀이도 함께</strong><span>냥이TV 뒤에는 실제 장난감으로 사냥을 완성해 주세요.</span></li>
+      </ol>
+      <button class="dialog-done" value="close">알겠어, 같이 볼게</button>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="noscript">냥이 영상 목록을 보려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
+  <script src="./app.js"></script>
+</body>
+</html>
