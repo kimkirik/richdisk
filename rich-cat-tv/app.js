@@ -28,7 +28,37 @@ const videoCatalog=[
   {id:'oxBC-t16Gcc',title:'숫사슴·암사슴과 숲속 새',channel:'On Sunset Cove',category:'calm',stimulus:'low',duration:'약 8시간',minutes:480,score:80,why:'화면 변화가 과하지 않아 낮잠 전 조용한 자연 창으로 잘 어울려요.'}
 ];
 
-const videos=[...videoCatalog];
+const bonusVideoSeeds=[
+  ['fO3lUnuL5T4','birds','LensMyth'],['7-BwZu0O_bk','birds','LensMyth'],['02ML4zlcRpk','birds','Birder King'],
+  ['QSVxmzAqaIc','birds','Meow Meow TV'],['cEL4oNfySw8','birds','Cat Bird TV'],['jvUCHMNtVvE','birds','Zen Cat TV'],
+  ['-icCx_XGELk','birds','Cat Bird TV'],['WeFaz6ZMAeU','birds','Paws and Hearts HD'],['mO4j4nWOf3M','birds','LensMyth'],
+  ['lnKoQLSeS5U','birds','Paul Dinning'],['GpgZriJI-Ho','birds','Birder King'],['__FX7YF8dhA','birds','Meow Meow TV'],
+  ['cICTGlCkpD0','birds','Cat Bird TV'],['sGfkdbgX01Y','birds','PurrNest TV'],['RtS4kYzvDo0','birds','My Meow TV'],
+  ['TcmD2h-KR70','squirrels','Birder King'],['sJAAVLCw_aI','squirrels','Videos For Cats'],['TrCYFFy8jhE','squirrels','Cat Bird TV'],
+  ['DqMYru_RWPs','squirrels','Birder King'],['Dix58mO0Pbc','squirrels','Birder King'],['d_QoanRKrKI','squirrels','Red Squirrel Studios'],
+  ['FmyRNJmKIfo','squirrels','Cat Toys Studio'],['3sJeUrbEh1o','squirrels','Cat Bird TV'],['zziWMBi6CyE','squirrels','PurrNest TV'],
+  ['5OWeFefVOFk','squirrels','Urban Hobbies'],['5hd9RQxnkzs','squirrels','Videos For Cats'],['LKW9xlR_SPM','squirrels','Cat Bird TV'],
+  ['dvKrZWEbhj4','squirrels','The Cat Eats Show'],['p_Uwfy5p9FI','squirrels','Purr & Feather TV'],['NGkxiqgi4rs','squirrels','Kat Nap TV'],
+  ['M6hq0aUQgk4','fish','Cat TV Fish Tank 4K'],['aJ1KYUO2ysU','fish','Cat TV Fish Tank 4K'],['g_oTUj9AIOc','fish','Safa Fish Cat TV'],
+  ['Q-2koc9lgZI','fish','The Timeless Garden'],['lLhCb8i5cy0','fish','Zen Cat TV'],['n0kIqhspl74','fish','Zen Cat TV'],
+  ['2Qel1R6Fgeo','fish','Cat Toys Studio'],['DpJvcIVGUHw','fish','Cat TV Fish Tank 4K'],['KxNm8313grs','fish','Relax Tank'],
+  ['gIv1WaJzAv4','fish','Cat TV Fish Tank 4K'],['Cqt8YPbBUWM','fish','Cat Lab Studios'],['XycrYM5z9Kk','fish','Zoë’s Cat TV'],
+  ['ATeit6LRXrc','fish','Sounds Cats React To'],['6qxZtm32kFY','fish','Yoshi’s Catflix'],['3RDa4ZKFBRk','fish','Cat TV Collection'],
+  ['INaB_kXHqd0','mice','Paul Dinning'],['sHlwV-EMZs0','mice','Paul Dinning'],['6pbreU5ChmA','mice','Paul Dinning'],
+  ['MTMxdy6jbnI','mice','Paul Dinning'],['EIFKgb3ivv4','mice','Paws & Chaos'],['uXN5MPwY2T8','mice','Best for Cats'],
+  ['QQo1U2wgsDs','mice','Next to Nature'],['2AgVMA02lTw','mice','Paul Dinning'],['Ste2fVF7OgM','mice','KingBirder'],
+  ['4CcKiRSjbU0','mice','GALBRO'],['qZRdCgzbHO0','mice','CATS TV'],['R49d7jahPg0','mice','Studio Cat King'],
+  ['9zE4FbmwSqM','mice','Ai Texnoo'],['nNMKf4IRZ9E','mice','Cat Games 28'],
+  ['qTMJl9e4-zI','calm','On Sunset Cove'],['ENSDb0Xwj_M','calm','PawWildia Nature TV'],['XhzyzLqYrg0','calm','Heart Scene'],
+  ['P67jx1sttdc','calm','Feline Forest TV'],['7DyOK2Kjr80','calm','PurrWild Garden TV'],['KinjsVJn0-o','calm','LensMyth'],
+  ['xbs7FT7dXYc','calm','Paul Dinning'],['MrSYP-cotdg','calm','Birder King'],['fLz3Jf6uUvY','calm','PurrNest Wildlife TV'],
+  ['MWL7m_ktW-Y','calm','Cat Bird TV'],['vMfyMCs_vUQ','calm','Window Birds TV'],['dlS_gw1Uul0','calm','Heart Scene'],
+  ['mELGt73hSG4','calm','PurrWild Garden TV'],['hVnim_IrKCY','calm','Cat Garden TV']
+];
+const bonusTitles={birds:['창가의 새 놀이터','날갯짓 자연극장','정원 새 관찰'],squirrels:['다람쥐 숲속 탐험','꼬리 쫓기 놀이터','다람쥐와 새의 정원'],fish:['알록달록 수족관','물고기 물멍 시간','화면 속 물고기 잡기'],mice:['생쥐 숨바꼭질','쥐구멍 사냥 게임','빠른 생쥐 따라잡기'],calm:['느긋한 자연 창문','낮잠 전 숲 구경','편안한 야생 정원']};
+const bonusWhys={birds:'새의 날갯짓과 작은 움직임을 자연스럽게 따라보기 좋아요.',squirrels:'다람쥐의 빠르고 불규칙한 움직임이 냥이의 호기심을 깨워요.',fish:'화면을 부드럽게 오가는 물고기를 편안하게 관찰할 수 있어요.',mice:'작은 사냥감의 빠른 움직임에 집중하며 앞발 놀이를 즐겨요.',calm:'과한 화면 전환 없이 자연 풍경을 차분하게 감상하기 좋아요.'};
+const bonusVideos=bonusVideoSeeds.map(([id,category,channel],index)=>({id,title:`${bonusTitles[category][index%3]} ${String(index+28).padStart(3,'0')}`,channel,category,stimulus:{birds:'medium',squirrels:'high',fish:'low',mice:'high',calm:'low'}[category],duration:'냥이 영상',minutes:60,score:Math.max(72,94-Math.floor(index/4)),why:bonusWhys[category]}));
+const videos=[...videoCatalog,...bonusVideos];
 const categoryNames={birds:'새 구경',squirrels:'다람쥐·토끼',fish:'물고기',mice:'쥐·사냥감',calm:'편안한 자연'};
 const stimulusNames={high:'사냥 본능',medium:'호기심 톡톡',low:'느긋하게'};
 const stimulusOrder={low:1,medium:2,high:3};
@@ -44,8 +74,8 @@ let favoriteOnly=false;
 let toastTimer;
 let watchTimer;
 let timerRemaining=0;
-let visibleLimit=12;
-const pageSize=12;
+let visibleLimit=100;
+const pageSize=100;
 
 function reactionValue(reaction,strong=false){const values=strong?{pounce:8,watch:4,ignore:-10}:{pounce:3,watch:2,ignore:-4};return values[reaction]||0;}
 function personalScore(video){let learnedBonus=0;Object.entries(reactions).forEach(([id,reaction])=>{const watched=videos.find(item=>item.id===id);if(!watched)return;if(watched.category===video.category)learnedBonus+=reactionValue(reaction);if(watched.stimulus===video.stimulus)learnedBonus+=Math.round(reactionValue(reaction)/2)});learnedBonus=Math.max(-10,Math.min(10,learnedBonus));return Math.max(40,Math.min(100,video.score+learnedBonus+reactionValue(reactions[video.id],true)))}
