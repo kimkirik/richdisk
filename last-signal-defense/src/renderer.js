@@ -1,11 +1,11 @@
-import { cameraMatrix, upright } from "./viewport.js?v=20260907-mobile-score";
+import { cameraMatrix, upright } from "./viewport.js?v=20260909-resume";
 import {
   BIOMES,
   TOWERS,
   ENEMIES,
   pathDistance,
-} from "./data.js?v=20260907-mobile-score";
-import { towerStats } from "./engine.js?v=20260907-mobile-score";
+} from "./data.js?v=20260909-resume";
+import { towerStats } from "./engine.js?v=20260909-resume";
 const advancedTowerImage = new Image();
 advancedTowerImage.src = new URL(
   "../assets/advanced-towers.webp",
@@ -648,6 +648,8 @@ export class Renderer {
     this.seen = 0;
     this.stageId = 0;
     this.shake = 0;
+    this.victoryTime = null;
+    this.lastFallen = null;
     this.reduced = matchMedia("(prefers-reduced-motion: reduce)");
     this.defenders = new Image();
     this.defenders.src = new URL("../assets/defenders.webp", import.meta.url);
@@ -668,6 +670,8 @@ export class Renderer {
     this.effects = [];
     this.seen = 0;
     this.shake = 0;
+    this.victoryTime = null;
+    this.lastFallen = null;
   }
   burst(x, y, color, count, power = 1) {
     if (this.reduced.matches) return;
@@ -691,6 +695,14 @@ export class Renderer {
     const fresh = g.events.filter((e) => e.id > this.seen);
     for (const e of fresh) {
       this.seen = e.id;
+      if (e.type === "kill") this.lastFallen = e;
+      if (e.type === "victory") {
+        this.victoryTime = 0;
+        const { x, y } = g.stage.core;
+        this.burst(x, y, "#80f3ff", 72, 2.5);
+        if (this.lastFallen)
+          this.burst(this.lastFallen.x, this.lastFallen.y, "#fff1cb", 60, 2);
+      }
       if (
         [
           "shot",
@@ -747,7 +759,14 @@ export class Renderer {
     ctx.setTransform(...cameraMatrix(W, H, portrait));
     ctx.save();
     const moving = !g.paused && ["combat", "build"].includes(g.phase);
-    const step = moving ? Math.min(0.06, dt) * g.speed : 0;
+    const celebrating = g.phase === "victory" && this.victoryTime !== null;
+    if (celebrating && !g.paused)
+      this.victoryTime += Math.min(0.1, Math.max(0, dt));
+    const step = moving
+      ? Math.min(0.06, dt) * g.speed
+      : celebrating && !g.paused
+        ? Math.min(0.1, dt) * 0.28
+        : 0;
     const time = this.reduced.matches ? 0 : g.time;
     if (!this.reduced.matches && moving && this.shake > 0.1) {
       ctx.translate(
@@ -1102,6 +1121,7 @@ export class Renderer {
     }
     this.particles = this.particles.filter((p) => p.life > 0);
     ctx.restore();
+    if (celebrating && this.victoryTime < 3) this.drawVictory(g, portrait);
     if (!this.reduced.matches) {
       ctx.fillStyle = color;
       for (let i = 0; i < 22; i++) {
@@ -1115,6 +1135,78 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
+    ctx.restore();
+  }
+  drawVictory(g, portrait) {
+    const ctx = this.ctx;
+    const t = this.victoryTime;
+    const core = g.stage.core;
+    ctx.save();
+    if (this.reduced.matches) {
+      glow(ctx, core.x, core.y, 120, "#75ecff", 0.3);
+      ctx.restore();
+      return;
+    }
+    const fade = Math.min(1, t * 3) * Math.min(1, (3 - t) * 1.5);
+    // The last destroyed unit dissolves in slow motion while the simulation is stopped.
+    const fallen = this.lastFallen;
+    if (fallen?.kind && t < 1.5) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 0.6 * (1 - t / 1.5));
+      upright(ctx, fallen.x, fallen.y, portrait);
+      const size = fallen.boss ? 105 : 55;
+      const rect = enemyRects[fallen.kind];
+      if (
+        rect &&
+        advancedEnemyImage.complete &&
+        advancedEnemyImage.naturalWidth
+      )
+        atlasSprite(
+          ctx,
+          advancedEnemyImage,
+          rect,
+          fallen.x,
+          fallen.y + size * 0.2,
+          size,
+          size * 0.84,
+        );
+      else if (ENEMIES[fallen.kind].atlas !== undefined && this.monsters.complete && this.monsters.naturalWidth) {
+        const index = ENEMIES[fallen.kind].atlas;
+        const sw = this.monsters.naturalWidth / 3, sh = this.monsters.naturalHeight / 2;
+        ctx.drawImage(this.monsters, (index % 3) * sw, Math.floor(index / 3) * sh, sw, sh, fallen.x - size / 2, fallen.y - size * .68, size, size);
+      }
+      ctx.restore();
+      glow(
+        ctx,
+        fallen.x,
+        fallen.y,
+        45 + t * 100,
+        "#ffe4b5",
+        (1 - t / 1.5) * 0.5,
+      );
+    }
+    ctx.globalCompositeOperation = "lighter";
+    glow(ctx, core.x, core.y, 100 + t * 170, "#5bedff", fade * 0.42);
+    for (let i = 0; i < 3; i++) {
+      const age = t - i * 0.34;
+      if (age < 0) continue;
+      const radius = 28 + age * 510;
+      ctx.globalAlpha = Math.max(0, 0.65 - age * 0.2) * fade;
+      ctx.strokeStyle = i ? "#77d8ff" : "#c1ffff";
+      ctx.lineWidth = i ? 2 : 5;
+      ctx.beginPath();
+      ctx.arc(core.x, core.y, radius, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = fade;
+    ctx.save();
+    upright(ctx, core.x, core.y, portrait);
+    const beam = ctx.createLinearGradient(core.x, core.y - 650, core.x, core.y);
+    beam.addColorStop(0, "#55dfff00");
+    beam.addColorStop(1, "#b7fbff99");
+    ctx.fillStyle = beam;
+    ctx.fillRect(core.x - 10 - t * 4, core.y - 650, 20 + t * 8, 650);
+    ctx.restore();
     ctx.restore();
   }
 }

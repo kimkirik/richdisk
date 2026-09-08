@@ -11,6 +11,7 @@ const game = (extra = {}) => ({
 });
 test("score intensity follows battle and boss state, independently of game speed", () => {
   assert.deepEqual(scoreMix(game()), [0.86, 0, 0]);
+  assert.deepEqual(scoreMix(game({ phase: "victory" })), [0, 0, 0]);
   const first = game({ phase: "combat", wave: 1 });
   assert.ok(scoreMix(first)[1] > 0);
   assert.ok(
@@ -74,6 +75,9 @@ test("one lazy context starts three stems in sync and keeps mute/pause authorita
         start(t) {
           this.startedAt = t;
         },
+        stop() {
+          this.stopped = true;
+        },
       };
       sources.push(s);
       return s;
@@ -99,7 +103,8 @@ test("one lazy context starts three stems in sync and keeps mute/pause authorita
     assert.equal(contexts, 0);
     await Promise.all([audio.unlock(), audio.unlock()]);
     assert.equal(contexts, 1);
-    assert.equal(requests, 3);
+    await audio.fanfareLoading;
+    assert.equal(requests, 4);
     assert.equal(sources.length, 3);
     assert.equal(new Set(sources.map((s) => s.startedAt)).size, 1);
     assert.ok(sources.every((s) => s.loop && s.loopEnd === SCORE_SECONDS));
@@ -113,6 +118,29 @@ test("one lazy context starts three stems in sync and keeps mute/pause authorita
     assert.equal(audio.master.gain.value, 0);
     audio.setScene(game());
     assert.ok(audio.master.gain.value > 0);
+    audio.context.state = "interrupted";
+    audio.setScene(game());
+    assert.equal(audio.context.state, "running");
+    assert.equal(sources.length, 3);
+    audio.setScene(game({ phase: "victory" }));
+    audio.playVictory();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(sources.length, 4);
+    assert.equal(sources[3].loop, false);
+    assert.ok(audio.nodes.every(({ gain }) => gain.gain.value === 0));
+    audio.setScene(game({ phase: "victory" }), true);
+    assert.equal(audio.master.gain.value, 0);
+    audio.stopVictory();
+    assert.equal(sources[3].stopped, true);
+    // A late download must not start a cue after the player skips or enters another stage.
+    audio.playVictory();
+    audio.stopVictory();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(sources.length, 4);
+    await audio.setEnabled(false);
+    audio.playVictory();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(sources.length, 4);
     clearTimeout(audio.suspendTimer);
   } finally {
     globalThis.AudioContext = beforeContext;

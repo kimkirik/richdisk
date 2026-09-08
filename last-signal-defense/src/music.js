@@ -2,6 +2,7 @@
 export const SCORE_SECONDS = 48;
 export const STEMS = ["foundation", "battle", "boss"];
 export function scoreMix(game) {
+  if (game.phase === "victory") return [0, 0, 0];
   const combat = game.phase === "combat";
   const boss = game.enemies.some((enemy) =>
     ["titan", "sovereign"].includes(enemy.kind),
@@ -27,6 +28,7 @@ export class OrchestralAudio {
     this.mix = [0.86, 0, 0];
     this.nodes = [];
     this.voices = 0;
+    this.cueToken = 0;
   }
   async unlock() {
     if (!this.enabled) return;
@@ -84,6 +86,55 @@ export class OrchestralAudio {
       return { source, gain };
     });
     this.ready = true;
+    // A failed optional fanfare must not prevent the main score from playing.
+    this.fanfareLoading = fetch(
+      new URL("../assets/music/victory.mp3", import.meta.url),
+    )
+      .then((response) => (response.ok ? response.arrayBuffer() : null))
+      .then((data) => (data ? this.context.decodeAudioData(data) : null))
+      .then((buffer) => {
+        this.fanfareBuffer = buffer;
+      })
+      .catch(() => {});
+  }
+  playVictory() {
+    this.stopVictory();
+    if (!this.enabled || !this.context) return;
+    const token = this.cueToken;
+    this.victoryActive = true;
+    this.sync(true);
+    Promise.resolve(this.loading)
+      .then(() => this.fanfareLoading)
+      .then(() => {
+        if (token !== this.cueToken || !this.fanfareBuffer || !this.enabled)
+          return;
+        const source = this.context.createBufferSource();
+        const gain = this.context.createGain();
+        source.buffer = this.fanfareBuffer;
+        source.loop = false;
+        gain.gain.value = 0.95;
+        source.connect(gain).connect(this.master);
+        this.fanfare = { source, gain };
+        source.onended = () => {
+          source.disconnect();
+          gain.disconnect();
+          if (this.fanfare?.source === source) this.fanfare = null;
+        };
+        source.start(this.context.currentTime + 0.015);
+      })
+      .catch(() => {});
+  }
+  stopVictory() {
+    this.cueToken++;
+    this.victoryActive = false;
+    if (this.fanfare) {
+      const { source, gain } = this.fanfare;
+      this.fanfare = null;
+      gain.gain.cancelScheduledValues(this.context.currentTime);
+      gain.gain.setTargetAtTime(0, this.context.currentTime, 0.04);
+      source.stop(this.context.currentTime + 0.18);
+    }
+    this.sync(true);
   }
   setEnabled(value) {
     this.enabled = value;
@@ -97,7 +148,16 @@ export class OrchestralAudio {
       mix.some((v, i) => v !== this.mix[i]) || paused !== this.paused;
     this.mix = mix;
     this.paused = paused;
-    if (changed) this.sync(true);
+    // Mobile browsers can interrupt audio independently of our pause state.
+    // Restore the existing sources after focus/pageshow without starting new ones.
+    if (
+      changed ||
+      (!paused &&
+        this.enabled &&
+        this.context &&
+        this.context.state !== "running")
+    )
+      this.sync(true);
   }
   sync(force = false) {
     if (!this.context) return;
@@ -115,7 +175,11 @@ export class OrchestralAudio {
         }, 350);
       this.nodes.forEach(({ gain }, i) => {
         gain.gain.cancelScheduledValues(now);
-        gain.gain.setTargetAtTime(this.mix[i], now, 0.7);
+        gain.gain.setTargetAtTime(
+          this.victoryActive ? 0 : this.mix[i],
+          now,
+          this.victoryActive ? 0.1 : 0.7,
+        );
       });
     }
   }

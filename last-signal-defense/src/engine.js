@@ -5,7 +5,7 @@ import {
   pointAt,
   pathLength,
   wavePlan,
-} from "./data.js?v=20260907-mobile-score";
+} from "./data.js?v=20260909-resume";
 export const STEP = 1 / 60;
 export function createGame(stageId = 1) {
   const stage = STAGES[stageId - 1];
@@ -327,6 +327,7 @@ export function tick(g, dt = STEP) {
       g.energy += reward;
       g.score += reward * 10;
       emit(g, "kill", {
+        kind: e.kind,
         x: e.x,
         y: e.y,
         color: ENEMIES[e.kind].color,

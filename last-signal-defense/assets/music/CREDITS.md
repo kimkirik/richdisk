@@ -13,3 +13,6 @@ License and library information: https://versilian-studios.com/vsco-community/
 CC0: https://creativecommons.org/publicdomain/zero/1.0/
 
 All runtime audio is served from this game's own assets. No streaming service or external audio API is required.
+# Victory / final transmission
+
+`victory.mp3` is an original eight-second D-major victory fanfare, composed for the sector celebration and final campaign transmission using the same CC0 VSCO 2 Community Edition recordings. Horns, strings, trombone, timpani, snare, and cymbal resolve the battle score into a sustained final chord. It is hosted locally and does not require an external streaming service.

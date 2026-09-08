@@ -12,7 +12,7 @@ A dependency-free tactical tower defense game for GitHub Pages.
 - The `1×`, `2×` and `3×` controls change the whole simulation: movement, firing, projectile flight, damage over time and tactical cooldowns. Keyboard shortcuts: `1`, `2`, `3`; Space pauses when the page body has focus.
 - Clear all three waves to unlock the next sector. Stars and the highest unlocked stage are saved locally in the browser. A new stage starts with fresh units, core health, resources and 1× speed.
 - The map selector offers practice mode for all 20 maps. Practice does not change campaign progress.
-- Sound is opt-in. Reduced-motion preferences suppress debris and screen shake. Changing browser tabs pauses the operation.
+- Music begins on the first deliberate interaction. Reduced-motion preferences suppress debris and screen shake. Hidden tabs temporarily suspend game time and audio; returning automatically resumes the operation, while a manual pause or open stage-selection dialog remains paused.
 
 ## Architecture
 
@@ -42,7 +42,7 @@ node --test tests/*.test.mjs
 node tests/balance-pilot.mjs
 ```
 
-34 regression tests cover all 20 maps and 60 waves, stage unlocks, speed equivalence, pause guards, delayed missile damage, armor penetration, distinct tower effects, skill conditions, rewards and restart. The balance pilot uses the same engine and resource constraints as a player; it is evidence that every stage is clearable, not a replacement for human difficulty testing.
+41 regression tests cover all 20 maps and 60 waves, stage unlocks, speed equivalence, pause guards, delayed missile damage, armor penetration, distinct tower effects, skill conditions, rewards, restart, endings and visibility recovery. The balance pilot uses the same engine and resource constraints as a player; it is evidence that every stage is clearable, not a replacement for human difficulty testing.
 
 Responsive browser checks: 1363×936, 390×844, 320×568 and 844×390. Campaign stage completion, next-stage unlock and persistence after reload were also exercised through the actual UI.
 

@@ -1,14 +1,9 @@
-import { OrchestralAudio } from "./music.js?v=20260907-mobile-score";
-import {
-  PORTRAIT_QUERY,
-  padPercent,
-} from "./viewport.js?v=20260907-mobile-score";
-import {
-  STAGES,
-  BIOMES,
-  TOWERS,
-  ENEMIES,
-} from "./data.js?v=20260907-mobile-score";
+import { OrchestralAudio } from "./music.js?v=20260909-resume";
+import { bindPageLifecycle } from "./lifecycle.js?v=20260909-resume";
+import { recordVictory } from "./ending.js?v=20260909-resume";
+import { EndingPresentation } from "./ending-ui.js?v=20260909-resume";
+import { PORTRAIT_QUERY, padPercent } from "./viewport.js?v=20260909-resume";
+import { STAGES, BIOMES, TOWERS, ENEMIES } from "./data.js?v=20260909-resume";
 import {
   createGame,
   advance,
@@ -20,12 +15,8 @@ import {
   setSpeed,
   towerStats,
   upgradeCost,
-} from "./engine.js?v=20260907-mobile-score";
-import {
-  Renderer,
-  paintMap,
-  towerIcon,
-} from "./renderer.js?v=20260907-mobile-score";
+} from "./engine.js?v=20260909-resume";
+import { Renderer, paintMap, towerIcon } from "./renderer.js?v=20260909-resume";
 const $ = (s) => document.querySelector(s);
 const STORAGE = "last-signal-campaign-v2";
 let progress = { unlocked: 1, stars: {} },
@@ -36,6 +27,11 @@ try {
     progress = {
       unlocked: Math.max(1, Math.min(20, saved.unlocked)),
       stars: saved.stars && typeof saved.stars === "object" ? saved.stars : {},
+      completedAt:
+        Number.isFinite(saved.completedAt) && saved.completedAt > 0
+          ? saved.completedAt
+          : null,
+      finalBestScore: Math.max(0, Number(saved.finalBestScore) || 0),
     };
 } catch {
   storageAvailable = false;
@@ -65,6 +61,11 @@ root.innerHTML = `
 <dialog id="result-dialog" class="result-dialog"><div class="eyebrow" id="result-kicker"></div><h2 id="result-title"></h2><p id="result-detail"></p><div id="result-stars"></div><dl id="result-stats"></dl><button id="result-next" class="primary-action"></button><button id="result-maps" class="outline-action">스테이지 선택</button></dialog>`;
 const renderer = new Renderer($("#battle-canvas"));
 const music = new OrchestralAudio();
+const ending = new EndingPresentation(music, {
+  onResult: showResult,
+  onMaps: openCampaign,
+  onReplay: () => enter(g.stage.id, practice),
+});
 const portraitView = matchMedia(PORTRAIT_QUERY);
 const landscapeControls = matchMedia(
   "(max-height: 540px) and (orientation: landscape)",
@@ -262,6 +263,7 @@ function updateUI() {
   });
 }
 function enter(stageId, isPractice = false) {
+  ending.dismiss();
   g = createGame(stageId);
   practice = isPractice;
   selected = null;
@@ -323,17 +325,6 @@ function updateChosen() {
 function showResult() {
   const victory = g.phase === "victory";
   const stars = g.core >= 90 ? 3 : g.core >= 60 ? 2 : 1;
-  if (victory && !practice) {
-    progress.unlocked = Math.min(
-      20,
-      Math.max(progress.unlocked, g.stage.id + 1),
-    );
-    progress.stars[g.stage.id] = Math.max(
-      progress.stars[g.stage.id] || 0,
-      stars,
-    );
-    save();
-  }
   text("#result-kicker", victory ? "SECTOR SECURED" : "SIGNAL LOST");
   text(
     "#result-title",
@@ -350,7 +341,9 @@ function showResult() {
       : !storageAvailable
         ? "브라우저 저장이 제한되어 이번 진행은 저장하지 못했습니다."
         : victory
-          ? "다음 구역으로 연결할 준비가 되었습니다."
+          ? g.stage.id === 20
+            ? "마지막 통신망 복구를 완료했습니다."
+            : "다음 구역으로 연결할 준비가 되었습니다."
           : "배치를 바꿔 다시 도전하세요.",
   );
   text(
@@ -361,7 +354,11 @@ function showResult() {
     `<div><dt>코어</dt><dd>${g.core}</dd></div><div><dt>격파</dt><dd>${g.kills}</dd></div><div><dt>점수</dt><dd>${g.score.toLocaleString()}</dd></div>`;
   text(
     "#result-next",
-    victory && g.stage.id < 20 ? "다음 스테이지 ▷" : "다시 도전 ▷",
+    victory
+      ? g.stage.id < 20
+        ? "다음 스테이지 ▷"
+        : "작전 지도로 돌아가기 ↗"
+      : "다시 도전 ▷",
   );
   $("#result-dialog").showModal();
 }
@@ -370,8 +367,15 @@ $(".close-dialog").onclick = () => $("#campaign-dialog").close();
 $("#campaign-dialog").addEventListener("close", () => {
   g.paused = modalPause;
   updateUI();
-  if (["victory", "defeat"].includes(g.phase) && !$("#result-dialog").open)
-    showResult();
+  if (
+    ["victory", "defeat"].includes(g.phase) &&
+    !$("#result-dialog").open &&
+    !ending.dialog.open
+  ) {
+    if (g.phase === "victory" && g.stage.id === 20)
+      ending.begin(g, practice, progress, storageAvailable, true);
+    else showResult();
+  }
 });
 $("#enter-stage").onclick = () => {
   if (chosenStage > progress.unlocked) return;
@@ -468,6 +472,11 @@ document.addEventListener("keydown", () => {
 });
 
 $("#result-next").onclick = () => {
+  if (g.phase === "victory" && g.stage.id === 20) {
+    $("#result-dialog").close();
+    openCampaign();
+    return;
+  }
   const next =
     g.phase === "victory" && g.stage.id < 20 ? g.stage.id + 1 : g.stage.id;
   $("#result-dialog").close();
@@ -496,15 +505,17 @@ window.addEventListener("keydown", (e) => {
     updateUI();
   }
 });
-document.addEventListener("visibilitychange", () => {
-  music.setScene(g, document.hidden);
-  if (document.hidden && ["build", "combat"].includes(g.phase)) {
-    g.paused = true;
-    g.accumulator = 0;
-    updateUI();
-  }
-});
 let last = performance.now();
+bindPageLifecycle({
+  page: document,
+  host: window,
+  getGame: () => g,
+  audio: music,
+  resetClock: () => {
+    last = performance.now();
+  },
+  refresh: updateUI,
+});
 function frame(now) {
   const dt = (now - last) / 1000;
   last = now;
@@ -512,7 +523,7 @@ function frame(now) {
     advance(g, dt);
     for (const event of g.events.filter((e) => e.id > seen)) {
       seen = event.id;
-      beep(event.type);
+      if (event.type !== "victory") beep(event.type);
       if (event.type === "wave")
         announce(
           `SECTOR ${String(g.stage.id).padStart(2, "0")}`,
@@ -539,8 +550,15 @@ function frame(now) {
           "공세 방어 성공",
           "보급 도착 · 다음 공세를 준비하세요",
         );
-      if (["victory", "defeat"].includes(event.type)) showResult();
+      if (event.type === "victory") {
+        // Save at the moment of victory, even if the player skips or leaves the ending.
+        if (recordVictory(progress, g, practice)) save();
+        $("#battle-banner").classList.remove("visible");
+        ending.begin(g, practice, progress, storageAvailable);
+      }
+      if (event.type === "defeat") showResult();
     }
+    ending.advance(dt);
     renderer.draw(g, selected, hover, dt);
     if (now - uiTime > 100) {
       updateUI();
