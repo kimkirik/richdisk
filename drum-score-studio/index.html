@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0c0f" />
+    <meta
+      name="description"
+      content="MP3와 WAV를 브라우저에서 분석해 킥, 스네어, 하이햇 중심의 연습용 드럼 악보를 만드는 앱"
+    />
+    <title>드럼스코어 — MP3 자동 드럼 채보</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="드럼스코어 처음으로">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 36 36" role="img">
+              <circle cx="18" cy="19" r="10"></circle>
+              <path d="M8.5 17h19M11 25l-3 6M25 25l3 6M11 8l14 7M25 8l-14 7"></path>
+            </svg>
+          </span>
+          <span>
+            <strong>드럼스코어</strong>
+            <small>DRUM TRANSCRIBER</small>
+          </span>
+        </a>
+        <div class="top-actions">
+          <span class="privacy-chip"><i></i> 기기 안에서 분석</span>
+          <button class="icon-button" id="helpButton" type="button" aria-label="도움말 열기" title="도움말">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.8 9a2.35 2.35 0 0 1 4.5.9c0 1.8-2.3 2.1-2.3 3.6M12 17.4h.01"></path></svg>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="upload-panel" id="uploadPanel" aria-labelledby="uploadTitle">
+          <div class="upload-copy">
+            <span class="eyebrow">자동 채보 · BETA</span>
+            <h1 id="uploadTitle">곡을 넣으면 드럼 악보가 나와요.</h1>
+            <p>킥·스네어·하이햇의 타격을 찾고 BPM에 맞춰 연습용 악보로 정리합니다.</p>
+            <div class="upload-actions">
+              <label class="primary-button" for="audioFile">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 14v5h14v-5"></path></svg>
+                MP3 / WAV 선택
+              </label>
+              <input id="audioFile" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac" hidden />
+              <button class="secondary-button" id="demoButton" type="button">샘플 리듬으로 체험</button>
+              <label class="secondary-button" for="projectFile">프로젝트 열기</label>
+              <input id="projectFile" type="file" accept="application/json,.drumscore,.json" hidden />
+            </div>
+            <p class="file-note">최대 12분 · 오디오 파일은 서버에 올라가지 않습니다.</p>
+          </div>
+          <label class="drop-zone" id="dropZone" for="audioFile">
+            <span class="vinyl" aria-hidden="true"><i></i></span>
+            <strong>여기에 곡을 끌어다 놓기</strong>
+            <span>또는 눌러서 파일 선택</span>
+            <em>MP3 · WAV · M4A</em>
+          </label>
+        </section>
+
+        <section class="workspace is-hidden" id="workspace" aria-label="드럼 악보 작업 공간">
+          <div class="track-card">
+            <div class="track-heading">
+              <div class="track-icon" aria-hidden="true">♪</div>
+              <div class="track-meta">
+                <strong id="trackName">선택한 곡</strong>
+                <span id="trackDetails">파일을 준비하고 있어요</span>
+              </div>
+              <label class="replace-file" for="audioFile">다른 곡</label>
+            </div>
+
+            <div class="waveform-wrap">
+              <canvas id="waveform" width="1200" height="176" aria-label="오디오 파형"></canvas>
+              <div class="playhead" id="playhead" aria-hidden="true"></div>
+              <div class="wave-empty" id="waveEmpty">파형을 만드는 중…</div>
+            </div>
+
+            <div class="transport">
+              <button class="transport-button" id="rewindButton" type="button" aria-label="5초 뒤로">−5</button>
+              <button class="play-button" id="playButton" type="button" aria-label="재생" disabled>
+                <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"></path></svg>
+                <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"></path></svg>
+              </button>
+              <button class="transport-button stop-button" id="stopButton" type="button" aria-label="정지하고 처음으로" title="정지" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"></rect></svg>
+              </button>
+              <button class="transport-button" id="forwardButton" type="button" aria-label="5초 앞으로">+5</button>
+              <span class="timecode"><b id="currentTime">0:00</b><span>/</span><span id="duration">0:00</span></span>
+              <div class="transport-spacer"></div>
+              <label class="volume-control" aria-label="음량">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4M17 9c1.3 1.6 1.3 4.4 0 6"></path></svg>
+                <input id="volume" type="range" min="0" max="1" value="0.82" step="0.01" />
+              </label>
+            </div>
+          </div>
+
+          <aside class="analysis-card" aria-labelledby="settingsTitle">
+            <div class="card-title-row">
+              <div>
+                <span class="eyebrow">분석 설정</span>
+                <h2 id="settingsTitle">어떻게 적을까요?</h2>
+              </div>
+              <span class="beta-badge">BETA</span>
+            </div>
+
+            <div class="setting-grid">
+              <label class="field">
+                <span>BPM</span>
+                <div class="number-field">
+                  <input id="bpmInput" type="number" min="45" max="260" value="120" inputmode="numeric" />
+                  <button id="detectBpmButton" type="button">자동</button>
+                </div>
+              </label>
+              <label class="field">
+                <span>박자</span>
+                <select id="timeSignature">
+                  <option value="4/4">4 / 4</option>
+                  <option value="3/4">3 / 4</option>
+                  <option value="6/8">6 / 8</option>
+                </select>
+              </label>
+            </div>
+
+            <fieldset class="segmented-field">
+              <legend>악보 난이도</legend>
+              <div class="segmented" id="difficultyGroup">
+                <button type="button" data-difficulty="easy">쉬움</button>
+                <button type="button" data-difficulty="standard" class="active">표준</button>
+                <button type="button" data-difficulty="exact">원곡형</button>
+              </div>
+              <p id="difficultyHelp">불확실한 타격과 지나치게 촘촘한 음을 정리합니다.</p>
+            </fieldset>
+
+            <label class="slider-field">
+              <span><b>감지 민감도</b><output id="sensitivityValue">62%</output></span>
+              <input id="sensitivity" type="range" min="35" max="85" value="62" step="1" />
+              <small><span>또렷한 타격만</span><span>작은 타격까지</span></small>
+            </label>
+
+            <label class="isolation-toggle">
+              <input id="drumIsolation" type="checkbox" checked />
+              <span><b>다른 악기 억제</b><small>기타·보컬의 지속음을 최대한 제외</small></span>
+              <i aria-hidden="true"></i>
+            </label>
+
+            <button class="analyze-button" id="analyzeButton" type="button" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15h3l2-8 4 12 2-7h5"></path></svg>
+              <span>드럼 악보 만들기</span>
+            </button>
+          </aside>
+
+          <section class="progress-card is-hidden" id="progressCard" aria-live="polite">
+            <div class="progress-head">
+              <div class="analyzer-pulse" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+              <div>
+                <strong id="progressTitle">곡의 리듬을 듣고 있어요</strong>
+                <span id="progressDetail">오디오의 강약을 살펴보는 중…</span>
+              </div>
+              <b id="progressPercent">0%</b>
+            </div>
+            <div class="progress-track"><i id="progressBar"></i></div>
+          </section>
+
+          <section class="score-card is-hidden" id="scoreCard" aria-labelledby="scoreTitle">
+            <div class="score-toolbar">
+              <div>
+                <span class="eyebrow">자동 채보 결과</span>
+                <h2 id="scoreTitle">드럼 악보</h2>
+              </div>
+              <div class="score-stats" aria-label="분석 결과 요약">
+                <span><b id="resultBpm">120</b> BPM</span>
+                <span><b id="resultBars">0</b> 마디</span>
+                <span><b id="resultHits">0</b> 타격</span>
+              </div>
+              <div class="toolbar-actions">
+                <button class="tool-button active" id="editToggle" type="button" aria-pressed="true">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20ZM13.5 7l3.5 3.5"></path></svg>
+                  편집
+                </button>
+                <button class="tool-button" id="metronomeToggle" type="button" aria-pressed="false">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 20 2-16h6l2 16H7Zm5-13-2 8h4l-2-8Z"></path></svg>
+                  메트로놈
+                </button>
+                <div class="export-menu">
+                  <button class="export-button" id="exportButton" type="button" aria-expanded="false">
+                    내보내기
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
+                  </button>
+                  <div class="export-popover is-hidden" id="exportPopover">
+                    <button type="button" data-export="pdf"><b>PDF / 인쇄</b><span>인쇄 화면에서 PDF로 저장</span></button>
+                    <button type="button" data-export="midi"><b>MIDI</b><span>DAW·MuseScore에서 열기</span></button>
+                    <button type="button" data-export="musicxml"><b>MusicXML</b><span>악보 프로그램용</span></button>
+                    <button type="button" data-export="project"><b>프로젝트 파일</b><span>나중에 이어서 편집</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="instrument-palette" id="instrumentPalette" aria-label="입력할 드럼 선택">
+              <span>찍을 악기</span>
+              <button type="button" data-inst="crash"><i class="inst-crash">×</i> 크래시</button>
+              <button type="button" data-inst="ride"><i class="inst-ride">×</i> 라이드</button>
+              <button type="button" data-inst="openHat"><i class="inst-open-hat">⊗</i> 오픈 HH</button>
+              <button type="button" data-inst="hat" class="active"><i class="inst-hat">×</i> 하이햇</button>
+              <button type="button" data-inst="tomHigh"><i class="inst-tom">●</i> 탐1</button>
+              <button type="button" data-inst="tomMid"><i class="inst-tom">●</i> 탐2</button>
+              <button type="button" data-inst="snare"><i class="inst-snare">●</i> 스네어</button>
+              <button type="button" data-inst="tomFloor"><i class="inst-tom">●</i> 탐3</button>
+              <button type="button" data-inst="kick"><i class="inst-kick">●</i> 킥</button>
+            </div>
+
+            <div class="score-playback-bar" aria-label="악보 재생 제어">
+              <span>원곡 <b id="scoreCurrentTime">0:00</b></span>
+              <button id="scorePlayButton" type="button" disabled><i aria-hidden="true">▶</i><b id="scorePlayLabel">재생</b></button>
+              <button class="score-stop-button" id="scoreStopButton" type="button" disabled><i aria-hidden="true">■</i> 정지</button>
+            </div>
+
+            <div class="score-scroll" id="scoreScroll" tabindex="0" aria-label="생성된 악보. 각 칸을 눌러 타격을 수정할 수 있습니다.">
+              <div class="empty-score">악보를 만들면 이곳에 표시됩니다.</div>
+            </div>
+
+            <div class="score-legend">
+              <span><i class="legend-cross">×</i> 하이햇·심벌</span>
+              <span><i class="legend-solid"></i> 드럼 헤드</span>
+              <span><i class="legend-soft"></i> 확인이 필요한 음표</span>
+              <span class="legend-tip">악기를 고른 뒤 오선지의 원하는 박자를 누르면 추가·삭제돼요.</span>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="helpDialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <div>
+            <span class="eyebrow">사용 안내</span>
+            <h2>더 잘 채보하는 방법</h2>
+          </div>
+          <button class="icon-button" value="close" aria-label="닫기">×</button>
+        </div>
+        <ol>
+          <li><b>음질이 선명한 원곡</b>을 넣고 먼저 표준 난이도로 분석해 보세요.</li>
+          <li>기타·보컬이 음표로 잡히면 <b>다른 악기 억제</b>를 켜고 민감도를 조금 낮춰 주세요.</li>
+          <li>주황색 음표는 확신이 낮은 결과입니다. 원곡을 들으며 눌러서 고칠 수 있어요.</li>
+          <li>록·메탈의 빠른 필인이나 고스트노트는 자동 분석이 틀릴 수 있습니다.</li>
+          <li><b>× 음표는 하이햇·심벌</b>, 검은 타원은 탐·스네어·베이스드럼이며 5선의 높이로 악기를 구분합니다.</li>
+        </ol>
+        <p>현재 버전은 브라우저에서 빠르게 만드는 연습용 채보입니다. 서버형 드럼 분리 모델을 연결하면 정확도를 더 높일 수 있어요.</p>
+        <button class="primary-button dialog-ok" value="close">확인</button>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <audio id="audio" preload="metadata"></audio>
+    <script src="./app.js"></script>
+  </body>
+</html>
