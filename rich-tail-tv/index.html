@@ -9,7 +9,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BE%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://i.ytimg.com">
   <link rel="preconnect" href="https://www.youtube-nocookie.com">
-  <link rel="stylesheet" href="./styles.css?v=20260909-100">
+  <link rel="stylesheet" href="./styles.css?v=20260909-101">
 </head>
 <body>
   <a class="skip-link" href="#ranking">영상 목록으로 바로가기</a>
@@ -89,7 +89,7 @@
           <h2 id="rankingTitle">리치 추천 영상</h2>
           <p>사이트 안에서 재생되는 영상만 골랐어요. 반응을 남길수록 리치 취향에 맞춰집니다.</p>
         </div>
-        <div class="count-pill"><strong id="resultCount">90</strong>개 영상</div>
+        <div class="count-pill"><strong id="resultCount">100</strong>개 영상</div>
       </div>
 
       <div class="filter-panel">
@@ -97,12 +97,12 @@
           <span aria-hidden="true">⌕</span>
           <input id="searchInput" type="search" placeholder="강아지, 다람쥐, 공 검색" aria-label="영상 검색" autocomplete="off">
         </label>
-        <label><span>볼거리</span><select id="categorySelect"><option value="all">전체</option><option value="dogs">강아지 친구</option><option value="wildlife">새·다람쥐</option><option value="ball">공·애니메이션</option><option value="walk">자연 산책</option><option value="farm">농장 동물</option><option value="sound">소리 반응</option></select></label>
-        <label><span>자극 정도</span><select id="stimulusSelect"><option value="all">전체</option><option value="high">신나요</option><option value="medium">적당해요</option><option value="low">잔잔해요</option></select></label>
+        <label><span>볼거리 우선</span><select id="categorySelect"><option value="all">전체</option><option value="dogs">강아지 친구</option><option value="wildlife">새·다람쥐</option><option value="ball">공·애니메이션</option><option value="walk">자연 산책</option><option value="farm">농장 동물</option><option value="sound">소리 반응</option></select></label>
+        <label><span>자극 우선</span><select id="stimulusSelect"><option value="all">전체</option><option value="high">신나요</option><option value="medium">적당해요</option><option value="low">잔잔해요</option></select></label>
         <label><span>정렬</span><select id="sortSelect"><option value="score">기본 추천순</option><option value="rich">리치 맞춤순</option><option value="calm">잔잔한 순</option><option value="active">신나는 순</option><option value="duration">짧은 순</option></select></label>
       </div>
 
-      <div class="category-chips" id="categoryChips" aria-label="영상 종류 빠른 선택">
+      <div class="category-chips" id="categoryChips" aria-label="영상 종류 우선 추천">
         <button class="active" type="button" data-category="all" aria-pressed="true">전체</button>
         <button type="button" data-category="dogs">🐶 친구멍</button>
         <button type="button" data-category="wildlife">🐦 새·다람쥐</button>
@@ -154,6 +154,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <noscript><p class="noscript">영상 목록을 보려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
-  <script src="./app.js?v=20260909-100"></script>
+  <script src="./app.js?v=20260909-101"></script>
 </body>
 </html>

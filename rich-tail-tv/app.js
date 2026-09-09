@@ -182,9 +182,18 @@ function getFilteredVideos(){
   const sort=$('#sortSelect').value;
   let list=videos.filter(v=>{
     const haystack=`${v.title} ${v.original} ${v.channel} ${v.why}`.toLowerCase();
-    return(!query||haystack.includes(query))&&(category==='all'||v.category===category)&&(stimulus==='all'||v.stimulus===stimulus)&&(!favoriteOnly||favorites.has(v.id));
+    return(!query||haystack.includes(query))&&(!favoriteOnly||favorites.has(v.id));
   });
   list.sort((a,b)=>{
+    // 선택한 종류와 자극의 영상을 앞으로 모으되 전체 목록은 숨기지 않는다.
+    if(category!=='all'){
+      const categoryPriority=Number(b.category===category)-Number(a.category===category);
+      if(categoryPriority)return categoryPriority;
+    }
+    if(stimulus!=='all'){
+      const stimulusPriority=Number(b.stimulus===stimulus)-Number(a.stimulus===stimulus);
+      if(stimulusPriority)return stimulusPriority;
+    }
     if(sort==='rich')return personalScore(b)-personalScore(a)||b.score-a.score;
     if(sort==='calm')return stimulusOrder[a.stimulus]-stimulusOrder[b.stimulus]||b.score-a.score;
     if(sort==='active')return stimulusOrder[b.stimulus]-stimulusOrder[a.stimulus]||b.score-a.score;
@@ -226,7 +235,9 @@ function render(resetPage=false){
   $('#loadMore').hidden=visibleVideos.length>=currentList.length;
   $('#loadMore').textContent=`영상 더 보기 (${currentList.length-visibleVideos.length}개 남음)`;
   const category=$('#categorySelect');const stimulus=$('#stimulusSelect');const sort=$('#sortSelect');const query=$('#searchInput').value.trim();
-  $('#filterSummary').textContent=`${favoriteOnly?'리치찜 · ':''}${query?`“${query}” 검색 · `:''}${category.options[category.selectedIndex].text} · ${stimulus.options[stimulus.selectedIndex].text} · ${sort.options[sort.selectedIndex].text} · ${watchHistory.length}개 봄`;
+  const categoryLabel=category.value==='all'?'전체 영상':`${category.options[category.selectedIndex].text} 우선`;
+  const stimulusLabel=stimulus.value==='all'?'전체 자극':`${stimulus.options[stimulus.selectedIndex].text} 우선`;
+  $('#filterSummary').textContent=`${favoriteOnly?'리치찜 · ':''}${query?`“${query}” 검색 · `:''}${categoryLabel} · ${stimulusLabel} · ${sort.options[sort.selectedIndex].text} · ${watchHistory.length}개 봄`;
   $$('#categoryChips button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.category===category.value)));
   $$('.thumb-button').forEach(btn=>btn.addEventListener('click',()=>playVideo(btn.dataset.play,true)));
   $$('.favorite-button').forEach(btn=>btn.addEventListener('click',()=>toggleFavorite(btn.dataset.favorite)));
