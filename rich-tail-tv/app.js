@@ -108,8 +108,22 @@ videoCatalog.push(
   {id:'irjUXgvMBR4',title:'편안한 음악과 잔잔한 화면',original:'Relax My Dog TV with Calming Music',channel:'YouTube 글로벌',category:'walk',stimulus:'low',duration:'긴 영상',minutes:600,score:66,why:'강한 소리나 빠른 장면이 적어 조용한 저녁이나 낮잠 시간에 어울려요.'}
 );
 
+videoCatalog.push(
+  {id:'nYcHi9EgUHs',title:'졸졸 흐르는 시냇가에서 쉬는 8시간',original:'Relax Your Dog TV at the Babbling Brook',channel:'Paul Dinning',category:'walk',stimulus:'low',duration:'약 8시간',minutes:480,score:86,why:'잔잔한 시냇물과 숲의 움직임이 편안한 휴식 시간을 만들어줘요.'},
+  {id:'A8Padaq7BOQ',title:'혼자 있는 강아지를 위한 12시간 휴식',original:'Anti-Anxiety Video for Dogs Home Alone',channel:'Heal My Dog',category:'walk',stimulus:'low',duration:'약 12시간',minutes:720,score:85,why:'부드러운 음악과 느린 화면으로 혼자 있는 시간을 차분하게 채워줘요.'},
+  {id:'t36lxBkp-Mc',title:'숲속 시냇가의 다람쥐·까마귀·사슴',original:'Forest Stream with Squirrels, Crows and Deer',channel:'Four Paws TV',category:'wildlife',stimulus:'medium',duration:'약 10시간',minutes:600,score:90,why:'크기와 속도가 다른 야생동물이 자연스럽게 번갈아 등장해요.'},
+  {id:'ze869tziyg4',title:'지루함을 날리는 강아지 유치원 TV',original:'Dog Daycare TV — Entertainment for Dogs',channel:'Farm Dog TV',category:'dogs',stimulus:'high',duration:'긴 영상',minutes:480,score:92,why:'다른 강아지의 놀이와 움직임이 활발하게 이어져 친구를 보는 재미가 있어요.'},
+  {id:'sRrwWpywwXg',title:'8시간 신나는 강아지 놀이 TV',original:'8 Hours of Fun TV for Dogs',channel:'Relax My Dog',category:'dogs',stimulus:'high',duration:'약 8시간',minutes:480,score:91,why:'강아지가 좋아할 만한 움직임과 소리를 긴 시간 다양하게 보여줘요.'},
+  {id:'6THahHTu2vA',title:'강아지 친구들의 12시간 모험',original:'12 Hours Adventures for Dogs',channel:'Doggy Woods Retreat',category:'dogs',stimulus:'medium',duration:'약 12시간',minutes:720,score:90,why:'강아지 친구와 야외 모험을 번갈아 보여줘 지루할 틈이 적어요.'},
+  {id:'D-9yt0kgQE4',title:'하루 종일 보는 강아지 친구와 음악',original:'All Day Entertainment for Dogs',channel:'Farm Dog TV',category:'dogs',stimulus:'low',duration:'장시간',minutes:720,score:84,why:'강아지 장면과 편안한 음악을 섞어 놀이와 휴식 사이에 틀기 좋아요.'},
+  {id:'QMq2Q6hXZPI',title:'꿈나라로 가는 8시간 강아지 음악',original:'8 Hours of Soothing Music for Dogs',channel:'Paws in Peace',category:'walk',stimulus:'low',duration:'약 8시간',minutes:480,score:79,why:'부드러운 소리와 안정적인 화면이 낮잠 전 긴장을 낮춰줘요.'},
+  {id:'UWMvUagF2Vc',title:'카메라 가까이 온 다람쥐',original:'Squirrels for Dogs — Close Nibble',channel:'Squirrels for Dogs',category:'wildlife',stimulus:'high',duration:'긴 영상',minutes:480,score:88,why:'다람쥐의 얼굴과 먹는 움직임이 화면 가득 보여 시선을 끌어요.'},
+  {id:'04eJAzAJLl4',title:'보호자를 기다리며 보는 편안 멍TV',original:'Dog TV While You Are Away',channel:'Pawful Dreams',category:'walk',stimulus:'low',duration:'긴 영상',minutes:480,score:78,why:'분리불안이 있는 시간에 과하지 않은 음악과 화면을 제공해요.'},
+  {id:'qyhdLcS10CY',title:'가을 숲 사슴 자연극장 10시간',original:'Autumn Deer Nature TV',channel:'Four Paws TV',category:'wildlife',stimulus:'low',duration:'약 10시간',minutes:600,score:87,why:'가을 숲의 사슴과 잔잔한 자연 소리를 차분하게 감상할 수 있어요.'}
+);
+
 // YouTube 소유자가 외부 사이트 재생을 막은 영상은 카드에서 제외한다.
-const blockedEmbedIds=new Set(['YsTodYhSlqQ','-7yzLadUdHA','N4L7egfFnOI','QDY0euyVQLs','hC9r9y29lpA','UYyPPis5a1s','xZJ_v5TlCuM','AijIquoFx8Q','tlPVMZfxNY0','Yf89N9kzSc4']);
+const blockedEmbedIds=new Set(['YsTodYhSlqQ','-7yzLadUdHA','N4L7egfFnOI','QDY0euyVQLs','hC9r9y29lpA','UYyPPis5a1s','xZJ_v5TlCuM','AijIquoFx8Q','tlPVMZfxNY0','Yf89N9kzSc4','diYi2YbrnLk']);
 const videos=videoCatalog.filter(video=>!blockedEmbedIds.has(video.id));
 
 const categoryNames={dogs:'친구멍',wildlife:'새·다람쥐',ball:'공·애니',walk:'자연산책',farm:'농장친구',sound:'소리반응'};
@@ -120,14 +134,15 @@ const $$=selector=>[...document.querySelectorAll(selector)];
 const safeParse=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
 let favorites=new Set(safeParse('richDogTvFavorites',[]).filter(id=>videos.some(video=>video.id===id)));
 let reactions=safeParse('richDogTvReactions',{});
-let currentId=videos[0].id;
+let watchHistory=safeParse('richDogTvHistory',[]).filter(id=>videos.some(video=>video.id===id)).slice(0,videos.length);
+let currentId=watchHistory[0]||videos[0].id;
 let currentList=[...videos];
 let favoriteOnly=false;
 let toastTimer;
 let watchTimer;
 let timerRemaining=0;
-let visibleLimit=18;
-const pageSize=18;
+let visibleLimit=100;
+const pageSize=100;
 
 function reactionValue(reaction,strong=false){
   const values=strong?{wag:8,watch:4,ignore:-10}:{wag:3,watch:2,ignore:-4};
@@ -146,8 +161,13 @@ function personalScore(video){
 }
 
 function saveLocal(){
-  localStorage.setItem('richDogTvFavorites',JSON.stringify([...favorites]));
-  localStorage.setItem('richDogTvReactions',JSON.stringify(reactions));
+  try{
+    localStorage.setItem('richDogTvFavorites',JSON.stringify([...favorites]));
+    localStorage.setItem('richDogTvReactions',JSON.stringify(reactions));
+    localStorage.setItem('richDogTvHistory',JSON.stringify(watchHistory));
+  }catch{
+    showToast('이 브라우저에서는 찜 기록을 저장할 수 없어요.');
+  }
 }
 
 function showToast(message){
@@ -176,16 +196,19 @@ function getFilteredVideos(){
 
 function cardTemplate(v,index){
   const score=personalScore(v);
-  return `<article class="video-card ${index<3?'top-three':''}">
+  const watched=watchHistory.includes(v.id);
+  return `<article class="video-card ${index<3?'top-three':''} ${watched?'watched':''}">
     <button class="thumb-button" type="button" data-play="${v.id}" aria-label="${v.title} 재생">
-      <span class="rank-badge">${index+1}</span>
-      <img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="${v.title} 미리보기" loading="lazy">
+      <span class="rank-badge">TOP ${String(index+1).padStart(2,'0')}</span>
+      ${watched?'<span class="watched-mark">✓ 봤어요</span>':''}
+      <span class="thumb-fallback" aria-hidden="true">미리보기 준비 중</span>
+      <img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="${v.title} 미리보기" loading="lazy" decoding="async">
       <span class="duration-badge">${v.duration}</span>
     </button>
     <div class="card-body">
       <div class="card-meta"><span class="card-kind">${categoryNames[v.category]}</span><span class="score">추천 <b>${score}</b>점</span></div>
       <h3>${v.title}</h3><p class="channel">YouTube 영상 · 소리는 작게 시작</p><p class="why">${v.why}</p>
-      <div class="card-footer"><span class="stimulus" data-level="${v.stimulus}"><i></i>${stimulusNames[v.stimulus]}</span><button class="favorite-button ${favorites.has(v.id)?'active':''}" type="button" data-favorite="${v.id}" aria-label="${favorites.has(v.id)?'찜 해제':'리치찜'}">★</button></div>
+      <div class="card-footer"><span class="stimulus" data-level="${v.stimulus}"><i></i>${stimulusNames[v.stimulus]}</span><button class="favorite-button ${favorites.has(v.id)?'active':''}" type="button" data-favorite="${v.id}" aria-pressed="${favorites.has(v.id)}" aria-label="${v.title} ${favorites.has(v.id)?'찜 해제':'리치찜'}">★</button></div>
     </div>
   </article>`;
 }
@@ -197,12 +220,17 @@ function render(resetPage=false){
   $('#videoGrid').innerHTML=visibleVideos.map(cardTemplate).join('');
   $('#resultCount').textContent=currentList.length;
   $('#favoriteCount').textContent=favorites.size;
+  $('#desktopFavoriteCount').textContent=favorites.size;
   $('#emptyState').hidden=currentList.length>0;
   $('#videoGrid').hidden=currentList.length===0;
   $('#loadMore').hidden=visibleVideos.length>=currentList.length;
   $('#loadMore').textContent=`영상 더 보기 (${currentList.length-visibleVideos.length}개 남음)`;
+  const category=$('#categorySelect');const stimulus=$('#stimulusSelect');const sort=$('#sortSelect');const query=$('#searchInput').value.trim();
+  $('#filterSummary').textContent=`${favoriteOnly?'리치찜 · ':''}${query?`“${query}” 검색 · `:''}${category.options[category.selectedIndex].text} · ${stimulus.options[stimulus.selectedIndex].text} · ${sort.options[sort.selectedIndex].text} · ${watchHistory.length}개 봄`;
+  $$('#categoryChips button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.category===category.value)));
   $$('.thumb-button').forEach(btn=>btn.addEventListener('click',()=>playVideo(btn.dataset.play,true)));
   $$('.favorite-button').forEach(btn=>btn.addEventListener('click',()=>toggleFavorite(btn.dataset.favorite)));
+  $$('.thumb-button img').forEach(img=>img.addEventListener('error',()=>img.classList.add('is-missing'),{once:true}));
 }
 
 function currentVideo(){return videos.find(v=>v.id===currentId)||videos[0]}
@@ -211,6 +239,7 @@ function playVideo(id,scroll=false){
   const v=videos.find(item=>item.id===id);if(!v)return;
   clearWatchTimer();
   currentId=id;
+  watchHistory=[id,...watchHistory.filter(item=>item!==id)].slice(0,videos.length);saveLocal();
   $('#screenIdle').hidden=true;
   const frame=$('#videoFrame');frame.hidden=false;
   frame.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&playsinline=1" title="${v.title}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="eager"></iframe>`;
@@ -218,6 +247,7 @@ function playVideo(id,scroll=false){
   $('#nowRank').textContent=`추천 ${rank}`;$('#nowKicker').textContent=`${categoryNames[v.category]} · ${stimulusNames[v.stimulus]}`;$('#nowTitle').textContent=v.title;$('#nowWhy').textContent=v.why;$('#youtubeLink').href=`https://www.youtube.com/watch?v=${v.id}`;
   $('#stopVideo').hidden=false;$('#playerStatus').textContent='재생 중 · 소리는 작게, 리치가 편안한지 살펴보세요.';
   updateReactionButtons();
+  render();
   if(scroll)document.querySelector('.watch-deck').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -227,7 +257,17 @@ function clearWatchTimer(resetLabel=true){
 }
 
 function stopPlayback(message='시청을 끝냈어요. 리치의 반응을 남겨 다음 추천에 반영해 보세요.'){
-  clearWatchTimer();$('#videoFrame').replaceChildren();$('#videoFrame').hidden=true;$('#screenIdle').hidden=false;$('#stopVideo').hidden=true;$('#playerStatus').textContent=message;
+  clearWatchTimer();$('#videoFrame').replaceChildren();$('#videoFrame').hidden=true;updateIdleScreen(currentVideo());$('#screenIdle').hidden=false;$('#stopVideo').hidden=true;$('#playerStatus').textContent=message;
+}
+
+function updateIdleScreen(video){
+  const rank=videos.slice().sort((a,b)=>b.score-a.score).findIndex(item=>item.id===video.id)+1;
+  $('#idleImage').src=`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`;
+  $('#idleImage').alt=`${video.title} 영상 미리보기`;
+  $('#idleEyebrow').textContent=`리치 추천 ${rank}번 · ${categoryNames[video.category]}`;
+  $('#idleTitle').textContent='한 편 더 볼까?';
+  $('#idleDescription').textContent=video.why;
+  $('#startTest').innerHTML='<span aria-hidden="true">▶</span> 3분 반응 테스트';
 }
 
 function updateTimerLabel(){
@@ -250,13 +290,15 @@ function stepVideo(direction){
 
 function updateReactionButtons(){
   const selected=reactions[currentId];
-  $$('[data-reaction]').forEach(button=>button.classList.toggle('selected',button.dataset.reaction===selected));
+  $$('[data-reaction]').forEach(button=>{const active=button.dataset.reaction===selected;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active))});
 }
 
 function recordReaction(reaction){
-  reactions[currentId]=reaction;saveLocal();$('#sortSelect').value='rich';updateReactionButtons();render();
+  const removing=reactions[currentId]===reaction;
+  if(removing)delete reactions[currentId];else reactions[currentId]=reaction;
+  saveLocal();$('#sortSelect').value='rich';updateReactionButtons();render();
   const messages={wag:'좋아한 종류를 리치 맞춤 추천에 더 반영했어요 🐾',watch:'집중한 종류를 다음 추천에 반영했어요.',ignore:'관심 없는 종류는 다음 추천에서 낮췄어요.'};
-  showToast(messages[reaction]);
+  showToast(removing?'반응 기록을 지웠어요.':messages[reaction]);
 }
 
 function toggleFavorite(id){
@@ -265,27 +307,60 @@ function toggleFavorite(id){
 }
 
 function setCategory(category){
-  favoriteOnly=false;$('#categorySelect').value=category;
-  $$('#categoryChips button').forEach(button=>button.classList.toggle('active',button.dataset.category===category));
+  $('#categorySelect').value=category;
+  $$('#categoryChips button').forEach(button=>{const active=button.dataset.category===category;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active))});
   render(true);
+}
+
+function setActiveNav(name){
+  $$('[data-nav]').forEach(item=>item.classList.toggle('active',item.dataset.nav===name));
+}
+
+function openFavorites(){
+  favoriteOnly=true;setActiveNav('favorites');render(true);document.querySelector('#ranking').scrollIntoView({behavior:'smooth'});
+  if(!favorites.size)showToast('영상의 별표를 누르면 여기에 모아둘게요.');
+}
+
+function surpriseVideo(list=videos){
+  const allowed=list.filter(video=>reactions[video.id]!=='ignore'&&video.id!==currentId);
+  const fresh=allowed.filter(video=>!watchHistory.includes(video.id));
+  const pool=fresh.length?fresh:allowed.length?allowed:list;
+  return pool[Math.floor(Math.random()*pool.length)]||videos[0];
+}
+
+function launchQuickMode(mode){
+  resetAll();
+  if(mode==='surprise'){
+    const pick=surpriseVideo();playVideo(pick.id,false);showToast(`오늘의 깜짝 픽 · ${pick.title}`);
+  }else{
+    if(mode==='excited'){$('#categorySelect').value='ball';$('#stimulusSelect').value='high';$('#sortSelect').value='active'}
+    if(mode==='animal'){$('#categorySelect').value='wildlife'}
+    if(mode==='calm'){$('#stimulusSelect').value='low';$('#sortSelect').value='calm'}
+    render(true);const pick=surpriseVideo(currentList.slice(0,12));playVideo(pick.id,false);
+  }
+  setActiveNav('home');document.querySelector('#top').scrollIntoView({behavior:'smooth'});
 }
 
 function resetAll(){
   favoriteOnly=false;$('#searchInput').value='';$('#categorySelect').value='all';$('#stimulusSelect').value='all';$('#sortSelect').value='score';
-  $$('#categoryChips button').forEach(button=>button.classList.toggle('active',button.dataset.category==='all'));render(true);
+  $$('#categoryChips button').forEach(button=>{const active=button.dataset.category==='all';button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active))});render(true);
 }
 
 $('#startTest').addEventListener('click',()=>{
   const queue=videos.filter(video=>reactions[video.id]!=='ignore').sort((a,b)=>personalScore(b)-personalScore(a));
-  playVideo((queue[0]||videos[0]).id,false);toggleWatchTimer();
+  const fresh=queue.filter(video=>!watchHistory.includes(video.id));
+  playVideo((fresh[0]||queue[0]||videos[0]).id,false);toggleWatchTimer();
 });
 $('#prevVideo').addEventListener('click',()=>stepVideo(-1));
 $('#nextVideo').addEventListener('click',()=>stepVideo(1));
+$('#surpriseButton').addEventListener('click',()=>{const pick=surpriseVideo(currentList);playVideo(pick.id,false);showToast(`리치 픽 · ${pick.title}`)});
 $('#timerButton').addEventListener('click',toggleWatchTimer);
 $('#stopVideo').addEventListener('click',()=>stopPlayback());
 $('#fullscreenButton').addEventListener('click',async()=>{try{await $('#screenShell').requestFullscreen()}catch{showToast('영상 오른쪽 아래 전체화면 버튼을 눌러줘')}});
 $$('[data-reaction]').forEach(button=>button.addEventListener('click',()=>recordReaction(button.dataset.reaction)));
 $('#guideButton').addEventListener('click',()=>$('#guideDialog').showModal());
+$('#headerFavorites').addEventListener('click',openFavorites);
+$('#footerGuideButton').addEventListener('click',()=>$('#guideDialog').showModal());
 $('#searchInput').addEventListener('input',()=>render(true));
 $('#stimulusSelect').addEventListener('change',()=>render(true));
 $('#sortSelect').addEventListener('change',()=>render(true));
@@ -293,18 +368,13 @@ $('#categorySelect').addEventListener('change',event=>setCategory(event.target.v
 $$('#categoryChips button').forEach(button=>button.addEventListener('click',()=>setCategory(button.dataset.category)));
 $('#resetFilters').addEventListener('click',resetAll);
 $('#loadMore').addEventListener('click',()=>{visibleLimit+=pageSize;render()});
-$$('[data-quick]').forEach(button=>button.addEventListener('click',()=>{
-  const mode=button.dataset.quick;resetAll();
-  if(mode==='excited'){setCategory('ball');$('#stimulusSelect').value='high';$('#sortSelect').value='active'}
-  if(mode==='animal'){setCategory('wildlife')}
-  if(mode==='calm'){$('#stimulusSelect').value='low';$('#sortSelect').value='calm'}
-  render();document.querySelector('#ranking').scrollIntoView({behavior:'smooth'});
-}));
+$$('[data-quick]').forEach(button=>button.addEventListener('click',()=>launchQuickMode(button.dataset.quick)));
 $$('[data-nav]').forEach(button=>button.addEventListener('click',()=>{
-  $$('[data-nav]').forEach(item=>item.classList.remove('active'));button.classList.add('active');
+  setActiveNav(button.dataset.nav);
   if(button.dataset.nav==='home'){favoriteOnly=false;render(true);document.querySelector('#top').scrollIntoView({behavior:'smooth'})}
   if(button.dataset.nav==='ranking'){favoriteOnly=false;render(true);document.querySelector('#ranking').scrollIntoView({behavior:'smooth'})}
-  if(button.dataset.nav==='favorites'){favoriteOnly=true;render(true);document.querySelector('#ranking').scrollIntoView({behavior:'smooth'});if(!favorites.size)showToast('별표를 누르면 리치찜에 저장돼')}
+  if(button.dataset.nav==='favorites')openFavorites();
 }));
 
-updateReactionButtons();render();
+if(watchHistory.length){const recent=currentVideo();const rank=videos.slice().sort((a,b)=>b.score-a.score).findIndex(item=>item.id===recent.id)+1;updateIdleScreen(recent);$('#nowRank').textContent=`추천 ${rank}`;$('#nowKicker').textContent=`${categoryNames[recent.category]} · ${stimulusNames[recent.stimulus]}`;$('#nowTitle').textContent=recent.title;$('#nowWhy').textContent=recent.why;$('#youtubeLink').href=`https://www.youtube.com/watch?v=${recent.id}`}
+updateReactionButtons();resetAll();
