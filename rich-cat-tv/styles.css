@@ -27,6 +27,7 @@ button{cursor:pointer}
 .brand strong{display:block;font-size:20px;line-height:1.1;letter-spacing:-.03em}
 .brand small{display:block;color:#cfe4ff;font-size:12px;margin-top:4px}
 .header-actions{display:flex;align-items:center;gap:10px}
+.dog-link{color:var(--yellow);text-decoration:none;border:1px solid #635987;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800}
 .studio-status{display:inline-flex;align-items:center;gap:7px;color:#cfe4ff;font-size:10px;font-weight:900;letter-spacing:.13em}.studio-status i{width:7px;height:7px;background:#73e6a7;border-radius:50%;box-shadow:0 0 0 4px rgba(115,230,167,.12)}
 .key-free{background:#164984;border:1px solid #4f82ba;color:#fff;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800}
 .header-favorites{border:1px solid #4f82ba;background:#164984;color:#fff;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:900}.header-favorites span,.header-favorites b{color:var(--yellow)}.header-favorites b{min-width:18px;display:inline-block}
