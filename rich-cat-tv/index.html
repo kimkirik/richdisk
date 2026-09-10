@@ -9,7 +9,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://i.ytimg.com">
   <link rel="preconnect" href="https://www.youtube-nocookie.com">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=20260910-100">
 </head>
 <body>
   <a class="skip-link" href="#ranking">냥이 영상 목록으로 바로가기</a>
@@ -87,7 +87,7 @@
           <h2 id="rankingTitle">냥이 추천 영상</h2>
           <p>작고 자연스러운 움직임을 골랐어요. 반응을 남길수록 냥이 취향에 맞춰집니다.</p>
         </div>
-        <div class="count-pill"><strong id="resultCount">90</strong>개 영상</div>
+        <div class="count-pill"><strong id="resultCount">100</strong>개 영상</div>
       </div>
 
       <div class="filter-panel">
@@ -95,12 +95,12 @@
           <span aria-hidden="true">⌕</span>
           <input id="searchInput" type="search" placeholder="새, 물고기, 다람쥐 검색" aria-label="냥이 영상 검색" autocomplete="off">
         </label>
-        <label><span>볼거리</span><select id="categorySelect"><option value="all">전체</option><option value="birds">새 구경</option><option value="squirrels">다람쥐·토끼</option><option value="fish">물고기</option><option value="mice">쥐·작은 사냥감</option><option value="calm">편안한 자연</option></select></label>
-        <label><span>자극 정도</span><select id="stimulusSelect"><option value="all">전체</option><option value="high">사냥 본능</option><option value="medium">호기심 톡톡</option><option value="low">느긋하게</option></select></label>
+        <label><span>볼거리 우선</span><select id="categorySelect"><option value="all">전체</option><option value="birds">새 구경</option><option value="squirrels">다람쥐·토끼</option><option value="fish">물고기</option><option value="mice">쥐·작은 사냥감</option><option value="calm">편안한 자연</option></select></label>
+        <label><span>자극 우선</span><select id="stimulusSelect"><option value="all">전체</option><option value="high">사냥 본능</option><option value="medium">호기심 톡톡</option><option value="low">느긋하게</option></select></label>
         <label><span>정렬</span><select id="sortSelect"><option value="score">기본 추천순</option><option value="cat">냥이 맞춤순</option><option value="calm">느긋한 순</option><option value="active">활발한 순</option><option value="duration">짧은 순</option></select></label>
       </div>
 
-      <div class="category-chips" id="categoryChips" aria-label="영상 종류 빠른 선택">
+      <div class="category-chips" id="categoryChips" aria-label="영상 종류 우선 추천">
         <button class="active" type="button" data-category="all" aria-pressed="true">전체</button>
         <button type="button" data-category="birds">🐦 새 구경</button>
         <button type="button" data-category="squirrels">🐿️ 다람쥐</button>
@@ -151,6 +151,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <noscript><p class="noscript">냥이 영상 목록을 보려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
-  <script src="./app.js"></script>
+  <script src="./app.js?v=20260910-100"></script>
 </body>
 </html>
