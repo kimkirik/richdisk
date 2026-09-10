@@ -1,23 +1,5 @@
-const videos=[
-  {id:'b_xKQ20jnQA',title:'가을 정원의 새와 다람쥐 8시간',channel:'Birder King',category:'birds',stimulus:'medium',duration:'약 8시간',minutes:480,score:99,why:'작고 불규칙한 움직임과 실제 자연 소리가 첫 반응 테스트에 잘 맞아요.'},
-  {id:'VDmX50GKtys',title:'수족관 물고기 물멍 8시간',channel:'TV BINI',category:'fish',stimulus:'low',duration:'약 8시간',minutes:480,score:98,why:'물고기가 화면을 부드럽게 가로질러 흥분을 낮춘 채 시선을 끌어요.'},
-  {id:'vi8aw01OrP8',title:'잡아봐! 물고기 사냥 게임 8시간',channel:'CAT GAMES',category:'fish',stimulus:'high',duration:'약 8시간',minutes:480,score:97,why:'단순한 배경 위를 빠르게 움직이는 물고기를 따라보는 사냥 놀이예요.'},
-  {id:'cntQVbin6N0',title:'황금빛 계절의 새와 다람쥐',channel:'Birder King',category:'birds',stimulus:'medium',duration:'약 8시간',minutes:480,score:96,why:'화면 가까이 찾아오는 새와 다람쥐를 편안한 자연 소리와 함께 볼 수 있어요.'},
-  {id:'zupaflE-AY0',title:'숲속 새와 다람쥐 관찰 TV',channel:'Paul Dinning',category:'birds',stimulus:'medium',duration:'약 8시간',minutes:490,score:95,why:'작은 동물의 자연스러운 방문이 반복되지 않아 오래 집중하기 좋아요.'},
-  {id:'Y0w0cuHs6xk',title:'토끼와 다람쥐가 찾아오는 뒤뜰',channel:'Four Paws TV',category:'squirrels',stimulus:'medium',duration:'약 10시간',minutes:600,score:94,why:'토끼의 큰 움직임과 다람쥐의 빠른 움직임이 번갈아 나타나요.'},
-  {id:'H7p3aqkRCnQ',title:'다람쥐 파쿠르 놀이터',channel:'Dog TV 글로벌',category:'squirrels',stimulus:'high',duration:'긴 영상',minutes:480,score:93,why:'급격한 방향 전환과 점프가 화면 추적 반응을 확인하기 좋아요.'},
-  {id:'P4KtadP-TFc',title:'민들레 정원의 새와 다람쥐',channel:'On Sunset Cove',category:'birds',stimulus:'medium',duration:'약 8시간',minutes:480,score:92,why:'날갯짓과 다람쥐 움직임, 자연 소리의 균형이 좋아요.'},
-  {id:'yHciULtmhbw',title:'다람쥐·줄무늬다람쥐·새 10시간',channel:'Four Paws TV',category:'squirrels',stimulus:'high',duration:'약 10시간',minutes:600,score:91,why:'작은 동물이 화면을 자주 가로질러 활동적인 냥이에게 잘 맞아요.'},
-  {id:'RknXKnM8TCU',title:'정원 새를 가까이 보는 8시간',channel:'4K Birdsong Station',category:'birds',stimulus:'medium',duration:'약 8시간',minutes:480,score:90,why:'새의 날갯짓과 지저귐이 선명해 창밖을 보는 듯한 경험을 줘요.'},
-  {id:'UT6oisYJZzw',title:'가을 정원의 토끼·다람쥐·새',channel:'Four Paws TV',category:'squirrels',stimulus:'medium',duration:'약 10시간',minutes:600,score:89,why:'크기와 속도가 다른 동물이 번갈아 지나가 지루할 틈이 적어요.'},
-  {id:'AgsYoc9aYQI',title:'장난꾸러기 다람쥐와 숲속 친구',channel:'On Sunset Cove',category:'squirrels',stimulus:'high',duration:'약 8시간',minutes:480,score:88,why:'다람쥐가 카메라 가까이 다가와 사냥 본능을 자극해요.'},
-  {id:'50QYpYF8Q-c',title:'다람쥐·토끼·새 10시간',channel:'Four Paws TV',category:'squirrels',stimulus:'medium',duration:'약 10시간',minutes:600,score:87,why:'작은 야생동물이 자연스럽게 드나드는 관찰형 영상이에요.'},
-  {id:'z3xkR1HN5qU',title:'창문 너머 알록달록한 숲새',channel:'Paul Dinning',category:'birds',stimulus:'low',duration:'약 8시간',minutes:480,score:86,why:'창가에서 조용히 새를 바라보는 듯해 휴식 시간에 좋아요.'},
-  {id:'b4bnmUB2ggM',title:'숲 가장자리의 새와 자연 소리',channel:'Relax My Dog',category:'nature',stimulus:'low',duration:'약 8시간',minutes:480,score:85,why:'조용한 새 관찰 화면이라 낮잠 전 가벼운 자극으로 알맞아요.'},
-  {id:'9i71_WTfn-s',title:'꽃밭의 새와 잔잔한 새소리',channel:'Paul Dinning',category:'nature',stimulus:'low',duration:'약 8시간',minutes:480,score:84,why:'부드러운 배경과 또렷한 새 움직임이 예민한 냥이에게 부담이 적어요.'},
-  {id:'nYpdFLJIu74',title:'뒤뜰 동물들의 여름 하루',channel:'Four Paws TV',category:'nature',stimulus:'low',duration:'약 10시간',minutes:600,score:83,why:'자연스러운 새소리와 과하지 않은 동물 움직임이 편안한 호기심을 유지해요.'},
-  {id:'EKoJYVHynNI',title:'호숫가의 빠른 다람쥐와 새',channel:'On Sunset Cove',category:'birds',stimulus:'medium',duration:'약 8시간',minutes:480,score:82,why:'밝은 물가를 가로지르는 작은 동물을 선명하게 볼 수 있어요.'}
-];
+const videos=Array.isArray(window.CAT_TV_VIDEOS)?window.CAT_TV_VIDEOS:[];
+if(!videos.length)throw new Error('영상 목록을 불러오지 못했습니다.');
 
 const categoryNames={birds:'새',squirrels:'다람쥐·토끼',fish:'물고기',nature:'조용한 자연'};
 const stimulusNames={high:'활발해요',medium:'적당해요',low:'잔잔해요'};
@@ -33,8 +15,8 @@ let favoriteOnly=false;
 let toastTimer;
 let watchTimer;
 let timerRemaining=0;
-let visibleLimit=12;
-const pageSize=12;
+let visibleLimit=100;
+const pageSize=100;
 
 function reactionValue(reaction,strong=false){
   const values=strong?{pounce:8,watch:5,ignore:-10}:{pounce:3,watch:2,ignore:-4};
@@ -111,13 +93,23 @@ function render(resetPage=false){
   $$('.favorite-button').forEach(button=>button.addEventListener('click',()=>toggleFavorite(button.dataset.favorite)));
 }
 
+function updateNowMeta(video){
+  const rank=videos.slice().sort((a,b)=>b.score-a.score).findIndex(item=>item.id===video.id)+1;
+  $('#nowRank').textContent=`추천 ${rank}`;
+  $('#nowKicker').textContent=`${categoryNames[video.category]} · ${stimulusNames[video.stimulus]}`;
+  $('#nowTitle').textContent=video.title;
+  $('#nowWhy').textContent=video.why;
+  $('#youtubeLink').href=`https://www.youtube.com/watch?v=${video.id}`;
+  $('#screenIdle img').src=`https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`;
+  $('#screenIdle img').alt=`${video.title} 미리보기`;
+}
+
 function playVideo(id,scroll=false){
   const video=videos.find(item=>item.id===id);if(!video)return;
   clearWatchTimer();currentId=id;$('#screenIdle').hidden=true;
   const frame=$('#videoFrame');frame.hidden=false;
   frame.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&playsinline=1" title="${video.title}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="eager"></iframe>`;
-  const rank=videos.slice().sort((a,b)=>b.score-a.score).findIndex(item=>item.id===video.id)+1;
-  $('#nowRank').textContent=`추천 ${rank}`;$('#nowKicker').textContent=`${categoryNames[video.category]} · ${stimulusNames[video.stimulus]}`;$('#nowTitle').textContent=video.title;$('#nowWhy').textContent=video.why;$('#youtubeLink').href=`https://www.youtube.com/watch?v=${video.id}`;
+  updateNowMeta(video);
   $('#stopVideo').hidden=false;$('#playerStatus').textContent='재생 중 · 화면을 덮치려 하면 바로 시청을 끝내 주세요.';
   updateReactionButtons();
   if(scroll)document.querySelector('.watch-deck').scrollIntoView({behavior:'smooth',block:'start'});
@@ -169,8 +161,8 @@ $$('[data-quick]').forEach(button=>button.addEventListener('click',()=>{
 $$('[data-nav]').forEach(button=>button.addEventListener('click',()=>{
   $$('[data-nav]').forEach(item=>item.classList.remove('active'));button.classList.add('active');
   if(button.dataset.nav==='home'){favoriteOnly=false;render(true);document.querySelector('#top').scrollIntoView({behavior:'smooth'})}
-  if(button.dataset.nav==='ranking'){favoriteOnly=false;render(true);document.querySelector('#ranking').scrollIntoView({behavior:'smooth'})}
+  if(button.dataset.nav==='ranking'){resetAll();document.querySelector('#ranking').scrollIntoView({behavior:'smooth'})}
   if(button.dataset.nav==='favorites'){favoriteOnly=true;render(true);document.querySelector('#ranking').scrollIntoView({behavior:'smooth'});if(!favorites.size)showToast('별표를 누르면 냥이찜에 저장돼요')}
 }));
 
-updateReactionButtons();render();
+updateNowMeta(videos[0]);updateReactionButtons();render();
