@@ -1,0 +1,268 @@
+/* Preserve the established dark dashboard; make reading and recovery practical. */
+.shock-shell {
+  overflow-wrap: anywhere;
+}
+:where(button, a, [tabindex], summary):focus-visible {
+  outline: 2px solid #6de0d2;
+  outline-offset: 4px;
+}
+.signal-data-status,
+.market-data-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 14px 22px;
+  border-block: 1px solid #294047;
+  background: #101f25;
+  color: #bed0d7;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.signal-data-status strong,
+.market-data-status strong {
+  color: #8ee7cc;
+  font-weight: 650;
+}
+.signal-data-status.is-delayed {
+  background: #2b2316;
+  color: #ffe0a3;
+}
+.signal-data-status.is-delayed strong {
+  color: #ffe0a3;
+}
+.signal-data-status p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.market-data-status {
+  justify-content: space-between;
+}
+.market-data-status > div {
+  display: grid;
+  gap: 3px;
+}
+.data-retry {
+  border: 1px solid #4e747e;
+  border-radius: 8px;
+  color: #e1f4f5;
+  padding: 9px 13px;
+  min-height: 44px;
+  cursor: pointer;
+  background: #152d35;
+  font: inherit;
+}
+.data-retry:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.checkpoint-date {
+  display: block;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: #b3c7ce;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.summary-table-wrap {
+  overflow-x: auto;
+}
+.summary-table-wrap td {
+  min-width: 120px;
+}
+.signal-tab span small,
+.signal-tab small {
+  color: #b9cbd2;
+  font-size: 0.8rem;
+}
+.signal-tab strong {
+  font-size: 0.9375rem;
+  white-space: normal;
+}
+.signal-tab {
+  min-height: 70px;
+}
+.signal-alert-settings > p,
+.signal-alert-option > span {
+  font-size: 0.875rem;
+}
+.signal-alert-option {
+  min-height: 44px;
+}
+.signal-verdict p,
+.signal-factor p,
+.signal-factor > span,
+.brief-copy > p,
+.report-asset p,
+.report-group-card p,
+.report-conclusion p,
+.intro-copy,
+.report-mood p {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.signal-factor strong,
+.gold-market-strip strong {
+  font-size: 1rem;
+}
+.signal-factor h4,
+.signal-factor > div > span,
+.gold-market-strip > span,
+.chart-footnotes,
+.partial-note,
+.gold-method,
+.gold-alert-note,
+.cash-safety-note,
+.feed-note,
+.method-content,
+.report-disclaimer {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+.asset-chip,
+.category-chip {
+  min-height: 44px;
+  font-size: 0.875rem;
+}
+.event-copy strong {
+  font-size: 0.9375rem;
+}
+.event-copy small,
+.result-report-header p,
+.report-state,
+.summary-heading small {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.event-list {
+  scrollbar-width: thin;
+}
+@media (max-width: 620px) {
+  .signal-data-status,
+  .market-data-status {
+    padding: 12px 16px;
+  }
+  .signal-tab-list {
+    gap: 7px;
+  }
+  .signal-tab {
+    min-height: 64px;
+  }
+  .signal-alert-settings > div {
+    grid-template-columns: 1fr;
+  }
+  .signal-alert-option {
+    padding: 7px 10px;
+  }
+  .signal-callout {
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 12px;
+    padding: 18px 14px;
+  }
+  .signal-gauge,
+  .signal-gauge-placeholder {
+    width: 80px;
+  }
+  .signal-verdict p {
+    font-size: 0.9375rem;
+  }
+  .signal-factor-grid {
+    grid-template-columns: 1fr;
+  }
+  .signal-factor,
+  .signal-factor:nth-child(3) {
+    border-right: 0;
+    border-bottom: 1px solid #294047;
+    min-height: 0;
+    padding: 16px;
+  }
+  .signal-factor:last-child {
+    border-bottom: 0;
+  }
+  .market-data-status > div,
+  .data-retry {
+    width: 100%;
+  }
+  .gold-market-strip {
+    flex-wrap: wrap;
+  }
+  .gold-market-strip > span {
+    min-width: 40%;
+    padding-block: 8px;
+  }
+  .window-select {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .focus-readout {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .chart-stage {
+    overflow: hidden;
+  }
+  .report-extremes {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+/* The old mobile pseudo-label always said connected, even after a failed request. */
+.data-status {
+  font-size: 0.8125rem;
+}
+.data-status::after {
+  content: none;
+}
+.data-status > span {
+  background: #a4b7c1;
+  box-shadow: none;
+  animation: none;
+}
+@media (max-width: 620px) {
+  .data-status {
+    max-width: 125px;
+    font-size: 0.75rem;
+  }
+}
+@media (max-width: 620px) {
+  .intro-panel h1 {
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+  .intro-side {
+    margin-top: 16px;
+    gap: 12px;
+  }
+  .intro-copy {
+    margin-top: 0;
+    padding-left: 0;
+    border-left: 0;
+    font-size: 0.9375rem;
+  }
+  .signal-alert-settings {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+    justify-content: stretch;
+  }
+  .signal-alert-settings > div {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .signal-alert-option {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+  }
+  .data-status {
+    max-width: 140px;
+  }
+}
