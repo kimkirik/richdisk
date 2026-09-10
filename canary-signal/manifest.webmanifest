@@ -1,1 +1,26 @@
-{"name":"카나리아 프로젝트","short_name":"카나리아","description":"사회위기 조기경보와 단계별 대응 매뉴얼","start_url":"./","scope":"./","display":"standalone","background_color":"#07171b","theme_color":"#07171b","icons":[{"src":"./icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"./icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
+{
+  "name": "카나리아 프로젝트",
+  "short_name": "카나리아",
+  "description": "아산 기상·지진·환율 자료 확인과 비상 준비 매뉴얼",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07171b",
+  "theme_color": "#07191c",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "./",
+  "lang": "ko"
+}
