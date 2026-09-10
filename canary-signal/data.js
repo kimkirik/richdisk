@@ -1,6 +1,7 @@
+import {normalizeWeather, fetchWeather} from './weather.js?v=3.1';
 // All warning thresholds below are app reminders, never official weather alerts.
 export const feeds = {
-  weather: { name: '아산 기상', provider: 'Open-Meteo · 수치예보', symbol: '☀', link: 'https://open-meteo.com/',
+  weather: { name: '날씨', provider: 'Open-Meteo · 수치예보', symbol: '☀', link: 'https://open-meteo.com/',
     urls: ['https://api.open-meteo.com/v1/forecast?latitude=36.7898&longitude=127.0018&current=temperature_2m&hourly=precipitation_probability,wind_speed_10m&daily=temperature_2m_max&wind_speed_unit=ms&timezone=Asia%2FSeoul&forecast_days=1'] },
   quakes: { name: '세계 지진', provider: 'USGS · 지진 목록', symbol: '⌁', link: 'https://earthquake.usgs.gov/earthquakes/map/',
     urls: ['https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson'] },
@@ -20,18 +21,7 @@ export function fresh(id, data, now = Date.now()) {
 export function normalize(id, v, now = Date.now()) {
   let data;
   if (id === 'weather') {
-    const { current: c, hourly: h, daily: d } = v || {};
-    requireValue(c && h && d && v.timezone === 'Asia/Seoul');
-    requireValue(number(c.temperature_2m, -90, 65) && number(d.temperature_2m_max?.[0], -90, 65));
-    requireValue(v.current_units?.temperature_2m === '°C' && v.daily_units?.temperature_2m_max === '°C' && v.hourly_units?.wind_speed_10m === 'm/s' && v.hourly_units?.precipitation_probability === '%');
-    requireValue(Array.isArray(h.time) && h.time.length === 24 && Array.isArray(h.precipitation_probability) && Array.isArray(h.wind_speed_10m));
-    requireValue(h.precipitation_probability.length === 24 && h.wind_speed_10m.length === 24 && new Set(h.time).size === 24);
-    requireValue(h.precipitation_probability.every(x => number(x, 0, 100)) && h.wind_speed_10m.every(x => number(x, 0, 150)));
-    const sourceTime = koreaTime(c.time), day = d.time?.[0];
-    requireValue(Number.isFinite(sourceTime) && typeof day === 'string' && h.time.every((t, i) => t === `${day}T${String(i).padStart(2, '0')}:00`));
-    const rain = Math.max(...h.precipitation_probability), wind = Math.max(...h.wind_speed_10m), max = d.temperature_2m_max[0];
-    const reasons = [rain >= 80 && '강수확률 80% 이상', wind >= 20 && '최대풍속 20m/s 이상', max >= 35 && '일최고기온 35℃ 이상'].filter(Boolean);
-    data = { temperature: c.temperature_2m, max, rain, wind, day, sourceTime, reasons };
+    return normalizeWeather(v, now);
   } else if (id === 'quakes') {
     requireValue(v?.type === 'FeatureCollection' && Array.isArray(v.features) && number(v.metadata?.generated, 1, Number.MAX_SAFE_INTEGER));
     requireValue(v.metadata.status === 200 && v.metadata.count === v.features.length);
@@ -48,7 +38,8 @@ export function normalize(id, v, now = Date.now()) {
   if (!fresh(id, data, now)) throw new Error('자료의 기준 시각이 오래되었거나 올바르지 않습니다.');
   return data;
 }
-export async function fetchFeed(id, { fetcher = fetch, now = Date.now, timeout = 7000 } = {}) {
+export async function fetchFeed(id, { fetcher = fetch, now = Date.now, timeout = 7000, location } = {}) {
+  if (id === 'weather') return fetchWeather({location,fetcher,now,timeout});
   let lastError;
   for (const url of feeds[id].urls) {
     const controller = new AbortController();
@@ -66,8 +57,12 @@ export function summarize(states) {
   const weather = states.weather;
   const failed = Object.values(states).filter(s => s.status === 'error').length;
   const loading = Object.values(states).some(s => s.status === 'loading');
-  if (weather?.status === 'ok' && weather.data.reasons.length) return { tone: 'warn', word: '기상 주의', title: '오늘 예보, 한 번 더 확인하세요', body: weather.data.reasons.join(' · ') + '. 앱의 참고 기준입니다. 기상청 특보를 확인하세요.' };
-  if (loading) return { tone: 'unknown', word: '확인 중', title: '자료를 확인하고 있습니다', body: '기상·지진·환율을 각각 확인합니다. 확인되지 않은 자료로 안전을 판단하지 않습니다.' };
-  if (failed) return { tone: 'unknown', word: '확인 필요', title: failed === 3 ? '현재 자료를 확인할 수 없습니다' : `${failed}개 자료를 확인할 수 없습니다`, body: '아래 카드에서 다시 시도하거나 출처를 직접 확인하세요. 자료 부족은 안전을 뜻하지 않습니다.' };
-  return { tone: 'normal', word: '기준 미만', title: '아산 기상, 참고 기준 미만', body: '오늘 예보가 앱의 주의 기준 미만입니다. 세계 지진·환율은 참고 정보이며 지역 안전을 판정하지 않습니다.' };
+  if (weather?.status === 'ok') {
+    const d = weather.data, name = d.location?.label || '아산시';
+    if (d.reasons.length) return {tone:'warn',word:'기상 주의',title:`${name}, 오늘 예보를 확인하세요`,body:d.reasons.join(' · ') + '. 앱의 참고 기준입니다. 기상청 특보를 확인하세요.'};
+    if (!d.complete) return {tone:'unknown',word:'일부 확인',title:`${name} 기온 ${d.temperature.toFixed(1)}℃`,body:'현재 기온은 확인했습니다. 일부 예보가 제공되지 않아 주의 기준의 전체 판단은 보류합니다.'};
+    return {tone:'normal',word:'기준 미만',title:`${name} 기온 ${d.temperature.toFixed(1)}℃`,body:'오늘 기상 예보는 앱의 참고 기준 미만입니다.' + (failed ? ` 다른 ${failed}개 자료는 확인하지 못했습니다.` : ' 아래에서 현재 날씨와 앞으로의 예보를 확인하세요.')};
+  }
+  if (loading) return {tone:'unknown',word:'확인 중',title:'날씨를 확인하고 있습니다',body:'선택한 위치의 기온과 예보를 불러오고 있습니다.'};
+  return {tone:'unknown',word:'확인 필요',title:'현재 날씨를 다시 확인해 주세요',body:'날씨 제공처의 응답을 확인하지 못했습니다. 위치를 확인하고 다시 시도하거나 기상청 안내를 열어 주세요.'};
 }

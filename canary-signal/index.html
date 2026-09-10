@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07191c">
-  <meta name="description" content="아산 기상·세계 지진·기준 환율을 출처와 시각으로 확인하고, 비상 준비 목록과 대처 매뉴얼을 보관하세요.">
+  <meta name="description" content="현재 위치 날씨·세계 지진·기준 환율을 출처와 시각으로 확인하고, 비상 준비 목록과 대처 매뉴얼을 보관하세요.">
   <title>카나리아 프로젝트 · 상황 확인과 비상 준비</title>
   <link rel="icon" href="./favicon.png">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./style.css?v=2.1">
+  <link rel="stylesheet" href="./style.css?v=3.1">
 </head>
 <body data-tone="unknown">
 <a class="skip-link" href="#top">본문으로 건너뛰기</a>
@@ -22,7 +22,7 @@
   <div id="connection" class="connection" role="status" hidden>오프라인입니다. 최신 자료는 확인할 수 없지만 저장된 매뉴얼과 준비 목록은 사용할 수 있습니다.</div>
   <section class="hero" aria-labelledby="stateTitle">
     <div class="pulse"><div class="safety"><small>기상 참고</small><b id="stateWord">확인 중</b></div></div>
-    <div class="hero-copy"><p class="eyebrow">CANARY WATCH</p><h1 id="stateTitle">자료를 확인하고 있습니다</h1><p id="stateBody">기상·지진·환율을 각각 확인합니다.</p><p id="updated" class="meta" role="status">0/3 자료 확인</p></div>
+    <div class="hero-copy"><p class="eyebrow">CANARY WATCH · 내 주변 날씨</p><h1 id="stateTitle">자료를 확인하고 있습니다</h1><p id="stateBody">기상·지진·환율을 각각 확인합니다.</p><p id="updated" class="meta" role="status">0/3 자료 확인</p></div>
     <button class="gold" id="kitJump"><small>오늘의 준비</small><b>생존배낭 점검 <span aria-hidden="true">→</span></b></button>
   </section>
   <div class="tabs-nav" role="tablist" aria-label="카나리아 메뉴">
@@ -32,8 +32,9 @@
     <button id="tab-sources" role="tab" aria-selected="false" aria-controls="sources" tabindex="-1" data-tab="sources">자료 출처</button>
   </div>
   <section class="tab active" id="now" role="tabpanel" aria-labelledby="tab-now" tabindex="0">
-    <div class="title"><div><p class="eyebrow">상황 확인</p><h2>지금 확인할 정보</h2></div><button id="refresh">↻ 전체 새로고침</button></div>
+    <div class="title"><div><p class="eyebrow">상황 확인</p><h2>날씨와 지금 상황</h2></div><button id="refresh">↻ 전체 새로고침</button></div>
     <p class="section-note">화면을 보는 동안 5분마다 확인합니다. 각 자료의 기준 시각은 아래에 표시됩니다.</p>
+    <section class="weather-location" aria-label="날씨 위치 설정"><div><b id="weatherLocationName">아산시 기준</b><p id="locationCoordinates"></p></div><div class="location-buttons"><button id="useLocation">내 위치 날씨 보기</button><button id="useAsan">아산시 기준</button></div><p id="locationStatus" role="status"></p><small>위치는 날씨 조회에만 사용하며 앱에 저장하지 않습니다. GPS가 없는 기기는 Wi-Fi 등의 위치를 사용할 수 있습니다.</small></section>
     <div class="grid" id="cards">
       <article class="card" id="card-weather" aria-label="아산 기상"><h3>아산 기상</h3><p>자료 확인 중</p></article>
       <article class="card" id="card-quakes" aria-label="세계 지진"><h3>세계 지진</h3><p>자료 확인 중</p></article>
@@ -50,7 +51,7 @@
   </section>
   <section class="tab" id="method" role="tabpanel" aria-labelledby="tab-method" tabindex="0" hidden>
     <div class="title"><div><p class="eyebrow">투명하게 확인하기</p><h2>카나리아의 판단 원칙</h2></div></div>
-    <div class="method-grid"><article><b>01</b><h3>자료의 성격</h3><p>Open-Meteo는 기상 모델 추정·예보, USGS는 지진 목록, Frankfurter는 일별 참고환율입니다.</p></article><article><b>02</b><h3>제한된 판단</h3><p>기상 수치만 앱의 참고 기준과 비교합니다. 지진 건수와 환율로 아산의 안전을 판정하지 않습니다.</p></article><article><b>03</b><h3>시간 확인</h3><p>기온 기준이 2시간, 지진 목록 생성이 30분, 환율 기준일이 7일을 넘으면 다시 확인하도록 표시합니다.</p></article><article><b>04</b><h3>판단 보류</h3><p>누락·오래된 자료·연결 실패를 0이나 안전으로 바꾸지 않습니다. 실패한 자료만 다시 확인할 수 있습니다.</p></article></div>
+    <div class="method-grid"><article><b>01</b><h3>자료의 성격</h3><p>Open-Meteo는 선택한 위치의 기상 모델 추정·예보, USGS는 지진 목록, Frankfurter는 일별 참고환율입니다.</p></article><article><b>02</b><h3>제한된 판단</h3><p>기상 수치만 앱의 참고 기준과 비교합니다. 지진 건수와 환율로 현재 위치의 안전을 판정하지 않습니다.</p></article><article><b>03</b><h3>시간 확인</h3><p>기온 기준이 2시간, 지진 목록 생성이 30분, 환율 기준일이 7일을 넘으면 다시 확인하도록 표시합니다.</p></article><article><b>04</b><h3>판단 보류</h3><p>기온은 확인되는 즉시 표시하고 빠진 예보 항목은 따로 표시합니다. 기본 날씨 조회가 실패하면 대체 기상 모델로 다시 확인합니다.</p></article></div>
     <div class="threshold"><b>앱에서 사용하는 기상 참고 기준</b><p>오늘 최대 강수확률 80% 이상 · 오늘 최대풍속 20m/s 이상 · 오늘 최고기온 35℃ 이상</p><p>이는 기상청 특보 기준이 아닙니다. 강수확률은 강수량이 아니며, 확률만으로 홍수·침수 위험을 알 수 없습니다. 오늘 하루 예보의 최댓값이므로 이미 지난 시간대가 포함됩니다.</p><a href="https://www.weather.go.kr/" target="_blank" rel="noopener noreferrer">기상청의 최신 특보 확인 ↗</a></div>
     <div class="truth"><b>알림의 제공 범위</b><p>‘시험 알림’은 이 기기에서 알림 표시가 되는지 확인합니다. 자동 위험 알림, 앱을 닫은 뒤의 감시·푸시 발송은 제공하지 않습니다.</p></div>
   </section>
@@ -69,8 +70,8 @@
   </section>
   <noscript><p class="connection">실시간 자료와 저장 기능에는 JavaScript가 필요합니다. <a href="https://www.safekorea.go.kr/">국민안전24에서 최신 안내를 확인하세요.</a></p></noscript>
 </main>
-<footer><div class="footer-brand"><img src="./canary-icon.png" alt="" width="36" height="36"><span><b>카나리아 프로젝트</b><small>공포보다 근거, 예언보다 준비</small></span></div><div><p id="notificationNote">시험 알림만 제공 · 자동 재난 경보 서비스 아님</p><small>v2 · 표시 시각은 한국 표준시(KST)</small></div></footer>
+<footer><div class="footer-brand"><img src="./canary-icon.png" alt="" width="36" height="36"><span><b>카나리아 프로젝트</b><small>공포보다 근거, 예언보다 준비</small></span></div><div><p id="notificationNote">시험 알림만 제공 · 자동 재난 경보 서비스 아님</p><small>v3 · GPS 위치 날씨 · 표시 시각은 한국 표준시(KST)</small></div></footer>
 <dialog id="dialog" aria-labelledby="dialogTitle"><button class="close" aria-label="매뉴얼 닫기" autofocus>×</button><div id="dialogBody"></div></dialog>
-<script src="./app.js?v=2.1" type="module"></script>
+<script src="./app.js?v=3.1" type="module"></script>
 </body>
 </html>

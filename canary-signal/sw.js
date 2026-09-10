@@ -1,7 +1,7 @@
 const ROOT = new URL('./', self.location.href);
 const PREFIX = `canary-signal:${ROOT.pathname}:`;
-const CACHE = `${PREFIX}v2.1`;
-const ASSETS = ['./', './index.html', './style.css?v=2.1', './app.js?v=2.1', './data.js?v=2.1', './manifest.webmanifest', './favicon.png', './canary-icon.png', './icon-192.png', './icon-512.png', './apple-touch-icon.png'].map(path => new URL(path, ROOT).href);
+const CACHE = `${PREFIX}v3.1`;
+const ASSETS = ['./', './index.html', './style.css?v=3.1', './app.js?v=3.1', './data.js?v=3.1', './weather.js?v=3.1', './location.js?v=3.1', './manifest.webmanifest', './favicon.png', './canary-icon.png', './icon-192.png', './icon-512.png', './apple-touch-icon.png'].map(path => new URL(path, ROOT).href);
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });

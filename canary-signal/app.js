@@ -1,4 +1,6 @@
-import { feeds, fetchFeed, summarize, fresh } from './data.js?v=2.1';
+import {ASAN, weatherDescription} from './weather.js?v=3.1';
+import {locate, locationError} from './location.js?v=3.1';
+import { feeds, fetchFeed, summarize, fresh } from './data.js?v=3.1';
 
 const manuals=[
 {id:'disaster',icon:'⌁',name:'재난·정전',summary:'침수·정전·통신 장애에 대비한 2~3일 생존 준비',source:'국민안전24',url:'https://safekorea.go.kr/',now:['재난문자와 기상청 특보를 확인하세요.','휴대전화·보조배터리를 충전하세요.','가족 연락 방법과 만날 장소를 정하세요.'],prepare:['식수·간편식·생필품을 2~3일분 준비하세요.','손전등·라디오·여분 건전지를 한곳에 두세요.','반려동물 사료·복용약·이동장을 함께 챙기세요.'],avoid:['침수된 지하차도나 하천 진입','출처가 없는 대피 명령 공유','정전 중 엘리베이터 이용']},
@@ -91,11 +93,45 @@ $('#kitList').addEventListener('change', e => {
   writeList('canary-kit-v2', checked); updateKit();
 });
 const states = Object.fromEntries(Object.keys(feeds).map(id => [id, { status:'loading' }]));
-const inflight = new Map();
+const inflight = new Map(), requestTokens = new Map();
+let weatherLocation = {...ASAN}, locationToken = 0, findingLocation = false;
+function updateLocation(message = '') {
+  $('#weatherLocationName').textContent = weatherLocation.mode === 'gps' ? '현재 위치 기준' : '아산시 기준';
+  $('.location').textContent = weatherLocation.mode === 'gps' ? '현재 위치 날씨' : '충남 아산';
+  const coordinateText = `${weatherLocation.latitude.toFixed(4)}, ${weatherLocation.longitude.toFixed(4)}`;
+  $('#locationCoordinates').textContent = weatherLocation.mode === 'gps' ? `위도·경도 ${coordinateText} · 정확도 약 ${weatherLocation.accuracy < 1000 ? Math.round(weatherLocation.accuracy) + 'm' : (weatherLocation.accuracy / 1000).toFixed(1) + 'km'} · 확인 ${fmt(weatherLocation.acquired)} KST` : '아산시 중심 좌표 · 현재 위치를 허용하면 기기 위치로 바뀝니다.';
+  $('#locationStatus').textContent = message || (weatherLocation.mode === 'gps' ? (weatherLocation.accuracy > 1000 ? '위치 오차가 큽니다. 더 정확한 위치가 필요하면 다시 확인하세요.' : '기기가 전달한 위치로 날씨를 조회합니다.') : '위치 권한을 허용하면 내 주변 날씨로 바뀝니다.');
+  $('#useLocation').disabled = findingLocation;
+  $('#useLocation').textContent = findingLocation ? '위치 확인 중…' : weatherLocation.mode === 'gps' ? '위치 다시 확인' : '내 위치 날씨 보기';
+  renderSummary();
+}
+async function useLocation() {
+  const token = ++locationToken;
+  findingLocation = true; updateLocation('위치 권한 요청이 나오면 허용해 주세요. GPS·Wi-Fi 등 기기의 위치 기능으로 확인합니다.');
+  try {
+    const location = await locate(navigator.geolocation);
+    if (token !== locationToken) return;
+    weatherLocation = location; findingLocation = false; updateLocation();
+    await loadOne('weather',true);
+  } catch(error) {
+    if (token === locationToken) {findingLocation = false;updateLocation(locationError(error) + (weatherLocation.mode === 'gps' ? ' 마지막으로 확인한 위치의 날씨를 유지합니다.' : ' 아산시 기준으로 표시합니다.'));loadOne('weather',true);}
+  }
+}
+$('#useLocation').onclick = useLocation;
+$('#useAsan').onclick = () => {locationToken++;findingLocation=false;weatherLocation={...ASAN};updateLocation();loadOne('weather',true);};
+const valueText = (value,unit,digits=0) => value === null || value === undefined ? '자료 없음' : `${value.toFixed(digits)}${unit}`;
+const hourText = time => new Intl.DateTimeFormat('ko-KR',{hour:'numeric',timeZone:'Asia/Seoul',hour12:false}).format(new Date(time));
+function weatherContent(d) {
+  const soon = d.hourly.slice(0,6);
+  const rainSoon = soon.some(h => (h.rain !== null && h.rain >= 60) || (h.precipitation !== null && h.precipitation > 0));
+  const guidance = rainSoon ? '앞으로 비 예보가 있습니다. 외출할 때 우산을 확인하세요.' : d.feels !== null && d.feels >= 33 ? '체감온도가 높습니다. 야외 활동 전 더위에 대비하세요.' : d.currentWind !== null && d.currentWind >= 10 ? '바람이 강합니다. 외출 전 기상청 특보를 확인하세요.' : '외출 전 시간대별 예보를 함께 확인하세요.';
+  return `<div class="weather-layout"><div class="weather-current"><p class="weather-condition">${weatherDescription(d.code,d.isDay)}</p><strong>${d.temperature.toFixed(1)}<small>℃</small></strong><p>현재 기온 · 모델 추정값</p><p>체감 ${valueText(d.feels,'℃',1)} · 오늘 ${valueText(d.min,'°',1)} / ${valueText(d.max,'°',1)}</p><div class="weather-metrics">${rows([['습도',valueText(d.humidity,'%')],['현재 바람',valueText(d.currentWind,' m/s',1)],['현재 강수량',valueText(d.precipitation,' mm',1)]])}</div><p class="card-time">기온 기준 ${fmt(d.sourceTime)} KST</p><p class="card-note">${esc(guidance)}</p></div><div class="weather-forecast"><h4>앞으로 12시간 <small>KST</small></h4>${d.hourly.length ? `<div class="hourly-weather" tabindex="0" role="region" aria-label="시간대별 날씨, 가로로 이동"><div class="hourly-track">${d.hourly.map(h=>`<div><b>${hourText(h.time)}</b><span>${weatherDescription(h.code)}</span><strong>${valueText(h.temperature,'°',1)}</strong><small>${h.rain !== null ? `강수 ${h.rain}%` : `강수 ${valueText(h.precipitation,'mm',1)}`}</small></div>`).join('')}</div></div>` : '<p>시간대별 예보는 제공되지 않았습니다.</p>'}<h4>3일 예보</h4><div class="daily-weather">${d.daily.length ? d.daily.map((item,i)=>`<div><b>${i===0 && item.day===d.day ? '오늘' : item.day.slice(5).replace('-','/')}</b><span>${weatherDescription(item.code)}</span><span>${valueText(item.min,'°',1)} / ${valueText(item.max,'°',1)}</span><small>${item.rain === null ? '강수확률 미제공' : `강수 ${item.rain}%`}</small></div>`).join('') : '<p>일별 예보는 제공되지 않았습니다.</p>'}</div><p class="card-note">${d.reasons.length ? esc(d.reasons.join(' · ')) : d.complete ? '오늘 예보는 앱의 참고 기준 미만입니다.' : '일부 예보 미제공 · 확인된 현재 기온은 표시합니다.'}</p></div></div>`;
+}
 function rows(list) { return `<dl>${list.map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`; }
 function renderFeed(id) {
   const card = $(`#card-${id}`), config = feeds[id], state = states[id];
   card.dataset.status = state.status;
+  if (id === 'weather') card.setAttribute('aria-label', (state.data?.location || weatherLocation).label + ' 날씨');
   card.setAttribute('aria-busy', state.status === 'loading');
   let status = '확인 중', content = '<div class="skeleton" aria-hidden="true"></div><p>자료를 불러오고 있습니다.</p>';
   if (state.status === 'error') {
@@ -104,33 +140,40 @@ function renderFeed(id) {
   }
   if (state.status === 'ok') {
     status = '확인됨'; const d = state.data;
-    if (id === 'weather') content = `<strong>${d.temperature.toFixed(1)}<small>℃</small></strong><p>현재 기온 · 모델 추정값</p>${rows([['오늘 최고기온', `${d.max.toFixed(1)}℃`], ['오늘 최대 강수확률', `${d.rain}%`], ['오늘 최대 풍속', `${d.wind.toFixed(1)} m/s`]])}<p class="card-note">${d.reasons.length ? esc(d.reasons.join(' · ')) + ' · 기상청 특보 확인' : '앱의 기상 참고 기준 미만'}</p><p class="card-time">기온 기준 ${fmt(d.sourceTime)} KST<br>예보 대상 ${d.day} · 아산 중심 좌표</p>`;
+    if (id === 'weather') content = weatherContent(d);
     if (id === 'quakes') content = `<strong>${d.count}<small>건</small></strong><p>목록 생성 기준 최근 24시간 · 규모 4.5 이상</p>${rows([['최대 규모', d.magnitude === null ? '해당 지진 없음' : `M ${d.magnitude.toFixed(1)}`], ['발생지', d.place ?? '해당 없음']])}${d.eventTime ? `<p class="card-time">최대 지진 ${fmt(d.eventTime)} KST</p>` : ''}<p class="card-note">세계 집계이며 아산의 위험도를 뜻하지 않습니다.</p><p class="card-time">목록 생성 ${fmt(d.sourceTime)} KST</p>`;
     if (id === 'fx') content = `<strong>${d.rate.toLocaleString('ko-KR', {maximumFractionDigits:1})}<small>원</small></strong><p>미화 1달러 기준 참고환율</p>${rows([['기준일', d.day], ['갱신 주기', '영업일 기준 일 1회']])}<p class="card-note">주말·휴일에는 직전 발표값입니다. 실시간 거래·은행 환전 가격과 다릅니다.</p><p class="card-time">확인 ${fmt(state.attempted)} KST</p>`;
   }
-  card.innerHTML = `<div class="card-head"><h3><span aria-hidden="true">${config.symbol}</span> ${config.name}</h3><span class="status-badge">${status}</span></div><p class="provider">${config.provider}</p>${content}<a class="source-link" href="${config.link}" target="_blank" rel="noopener noreferrer">자료 출처 ↗</a>`;
+  card.innerHTML = `<div class="card-head"><h3><span aria-hidden="true">${config.symbol}</span> ${id === 'weather' ? esc((state.data?.location || weatherLocation).label) + ' 날씨' : config.name}</h3><span class="status-badge">${status}</span></div><p class="provider">${esc(id === 'weather' ? state.data?.provider || config.provider : config.provider)}</p>${content}<a class="source-link" href="${config.link}" target="_blank" rel="noopener noreferrer">자료 출처 ↗</a>`;
 }
 function renderSummary() {
-  const s = summarize(states), pending = inflight.size > 0;
+  const s = summarize(states), pending = inflight.size > 0 || findingLocation;
   document.body.dataset.tone = s.tone;
   $('#stateWord').textContent = s.word; $('#stateTitle').textContent = s.title; $('#stateBody').textContent = s.body;
   const good = Object.values(states).filter(x => x.status === 'ok').length;
   $('#updated').textContent = `${good}/3 자료 확인${lastAttempt ? ` · 마지막 시도 ${fmt(lastAttempt)} KST` : ''}`;
   $('#refresh').disabled = pending; $('#refresh').textContent = pending ? '확인 중…' : '↻ 전체 새로고침';
 }
-function loadOne(id) {
-  if (inflight.has(id)) return inflight.get(id);
-  states[id] = {status:'loading'}; renderFeed(id);
-  lastAttempt = Date.now();
+function loadOne(id, force = false) {
+  if (inflight.has(id) && !force) return inflight.get(id);
+  const token = Symbol(id); requestTokens.set(id,token);
+  const location = {...weatherLocation};
+  states[id] = {status:'loading'}; renderFeed(id); lastAttempt = Date.now();
   const job = (async () => {
-    try { const data = await fetchFeed(id); states[id] = {status:'ok', data, attempted:Date.now()}; }
-    catch (error) { states[id] = {status:'error', attempted:Date.now(), message:!navigator.onLine ? '인터넷 연결을 확인해 주세요.' : error.name === 'AbortError' ? '응답이 지연되어 확인을 중단했습니다.' : ['응답 형식을 확인할 수 없습니다.', '자료의 기준 시각이 오래되었거나 올바르지 않습니다.'].includes(error.message) ? error.message : '제공처 연결에 실패했습니다. 잠시 후 다시 시도하세요.'}; }
-    finally { inflight.delete(id); renderFeed(id); renderSummary(); }
+    try {
+      const data = await fetchFeed(id,{location});
+      if (requestTokens.get(id) === token) states[id] = {status:'ok',data,attempted:Date.now()};
+    } catch(error) {
+      if (requestTokens.get(id) === token) states[id] = {status:'error',attempted:Date.now(),message:!navigator.onLine ? '인터넷 연결을 확인해 주세요.' : error.name === 'AbortError' ? '응답이 지연되고 있습니다. 잠시 후 다시 확인해 주세요.' : error.message && /자료|시각|기온|제공처/.test(error.message) ? error.message : '제공처 연결에 실패했습니다. 잠시 후 다시 시도하세요.'};
+    } finally {
+      if (requestTokens.get(id) === token) {inflight.delete(id);renderFeed(id);renderSummary();}
+    }
   })();
-  inflight.set(id, job); renderSummary(); return job;
+  inflight.set(id,job);renderSummary();return job;
 }
-async function loadAll() { await Promise.all(Object.keys(feeds).map(loadOne)); }
-$('#refresh').onclick = loadAll;
+async function loadAll() { await Promise.all(Object.keys(feeds).map(id=>loadOne(id))); }
+function refreshAll() {if(weatherLocation.mode === 'gps' && !findingLocation) {loadOne('quakes');loadOne('fx');return useLocation();}return loadAll();}
+$('#refresh').onclick = refreshAll;
 document.addEventListener('click', e => {
   const manual = e.target.closest('[data-manual]'); if (manual) openManual(manual.dataset.manual);
   const retry = e.target.closest('[data-retry]'); if (retry && feeds[retry.dataset.retry]) loadOne(retry.dataset.retry);
@@ -141,13 +184,13 @@ window.addEventListener('offline', () => {
   Object.keys(feeds).forEach(id => { if (!inflight.has(id)) { states[id] = {status:'error', message:'오프라인 상태라 최신 자료를 확인할 수 없습니다.', attempted:Date.now()}; renderFeed(id); } });
   renderSummary();
 });
-window.addEventListener('online', () => { connectionStatus(); loadAll(); });
+window.addEventListener('online', () => { connectionStatus(); refreshAll(); });
 function checkAge() {
   Object.keys(feeds).forEach(id => { const s = states[id]; if (s.status === 'ok' && !fresh(id, s.data)) { states[id] = {status:'error', attempted:Date.now(), message:'자료가 오래되어 다시 확인이 필요합니다.'}; renderFeed(id); } });
   renderSummary();
 }
-setInterval(() => { checkAge(); if (!document.hidden && navigator.onLine && Date.now() - lastAttempt >= 5 * 60000) loadAll(); }, 60000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkAge(); if (Date.now() - lastAttempt >= 5 * 60000) loadAll(); } });
+setInterval(() => { checkAge(); if (!document.hidden && navigator.onLine && Date.now() - lastAttempt >= 5 * 60000) refreshAll(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkAge(); if (Date.now() - lastAttempt >= 5 * 60000) refreshAll(); } });
 const registration = 'serviceWorker' in navigator ? navigator.serviceWorker.register('./sw.js', {scope:'./', updateViaCache:'none'}).catch(() => null) : Promise.resolve(null);
 registration.then(reg => { if (!reg) return; if (reg.active) $('#offlineReady').textContent = '매뉴얼은 첫 로딩 후 오프라인에서도 열 수 있습니다.'; else reg.installing?.addEventListener('statechange', e => { if (e.target.state === 'activated') $('#offlineReady').textContent = '매뉴얼은 첫 로딩 후 오프라인에서도 열 수 있습니다.'; }); });
 $('#notify').onclick = async () => {
@@ -164,4 +207,6 @@ $('#notify').onclick = async () => {
   } catch { toast('알림을 표시하지 못했습니다. 브라우저와 기기의 알림 설정을 확인하세요.'); }
   finally { $('#notify').disabled = false; }
 };
-renderManuals(); renderKit(); connectionStatus(); loadAll();
+renderManuals(); renderKit(); connectionStatus(); updateLocation(); loadAll();
+// Reuse an existing permission silently; first-time permission is requested by the button.
+navigator.permissions?.query({name:'geolocation'}).then(permission=>{if(permission.state === 'granted' && weatherLocation.mode === 'default' && locationToken === 0) useLocation();}).catch(()=>{});
