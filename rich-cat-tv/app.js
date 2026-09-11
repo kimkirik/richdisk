@@ -126,3 +126,19 @@ $$('[data-nav]').forEach(button=>button.addEventListener('click',()=>{setActiveN
 
 if(watchHistory.length){const recent=currentVideo();updateIdleScreen(recent);updateNowPlaying(recent)}
 updateReactionButtons();resetAll();
+
+let deferredInstallPrompt=null;
+const installTriggers=$$('.install-trigger');
+const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+function updateInstallButtons(){installTriggers.forEach(button=>{const installed=isStandalone();button.classList.toggle('installed',installed);button.setAttribute('aria-label',installed?'냥이TV가 설치되어 있어요':'냥이TV 앱 설치');const label=button.querySelector('small');if(label)label.textContent=installed?'설치됨':'설치'})}
+async function installApp(){
+  if(isStandalone()){showToast('냥이TV가 이미 앱으로 설치되어 있어요.');return}
+  if(deferredInstallPrompt){deferredInstallPrompt.prompt();const choice=await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;if(choice.outcome==='accepted')showToast('냥이TV 설치를 시작했어요!');return}
+  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  showToast(isIos?'Safari 공유 버튼에서 “홈 화면에 추가”를 눌러 주세요.':'브라우저 메뉴에서 “앱 설치” 또는 “홈 화면에 추가”를 선택해 주세요.');
+}
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallButtons()});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallButtons();showToast('냥이TV 설치 완료! 홈 화면에서 바로 만나요.')});
+installTriggers.forEach(button=>button.addEventListener('click',installApp));
+updateInstallButtons();
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));

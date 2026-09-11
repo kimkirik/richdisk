@@ -4,22 +4,29 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#25113f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="냥이TV">
   <meta name="description" content="새, 다람쥐, 물고기와 작은 움직임을 골라 보여주는 고양이 전용 냥이TV">
   <title>냥이TV — 수염이 먼저 고르는 채널</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png?v=20260911">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=20260911">
+  <link rel="manifest" href="./manifest.webmanifest?v=20260911">
   <link rel="preconnect" href="https://i.ytimg.com">
   <link rel="preconnect" href="https://www.youtube-nocookie.com">
-  <link rel="stylesheet" href="./styles.css?v=20260910-100">
+  <link rel="stylesheet" href="./styles.css?v=20260911-pwa">
 </head>
 <body>
   <a class="skip-link" href="#ranking">냥이 영상 목록으로 바로가기</a>
   <header class="topbar">
     <a class="brand" href="#top" aria-label="냥이TV 처음으로">
-      <span class="brand-mark" aria-hidden="true">🐱</span>
+      <span class="brand-mark" aria-hidden="true"><img src="./app-icon.png?v=20260911" alt=""></span>
       <span><strong>냥이TV</strong><small>수염이 먼저 고르는 채널</small></span>
     </a>
     <div class="header-actions">
-      <a class="dog-link" href="../rich-tail-tv/">🐶 멍TV</a>
+      <a class="dog-link" href="../rich-tail-tv/"><img src="./switch-dog-icon.png?v=20260911" alt="">멍TV</a>
+      <button class="install-button install-trigger" type="button"><span aria-hidden="true">⇩</span> 앱 설치</button>
       <span class="studio-status"><i aria-hidden="true"></i> CAT'S WINDOW</span>
       <button class="header-favorites" id="headerFavorites" type="button"><span aria-hidden="true">♥</span> 냥이찜 <b id="desktopFavoriteCount">0</b></button>
       <button class="icon-button" id="guideButton" type="button" aria-label="고양이 시청 안내">?</button>
@@ -123,7 +130,7 @@
     </section>
 
     <footer class="site-footer">
-      <span class="footer-mark" aria-hidden="true">🐾</span>
+      <span class="footer-mark" aria-hidden="true"><img src="./app-icon.png?v=20260911" alt=""></span>
       <div><strong>냥이TV</strong><p>반응을 살피며 짧고 즐겁게. 실제 사냥놀이와 교감을 대신하지 않아요.</p></div>
       <button type="button" id="footerGuideButton">안전 시청 가이드</button>
     </footer>
@@ -133,12 +140,13 @@
     <button type="button" data-nav="home" class="active"><span aria-hidden="true">⌂</span><small>냥이TV</small></button>
     <button type="button" data-nav="ranking"><span aria-hidden="true">♛</span><small>추천</small></button>
     <button type="button" data-nav="favorites"><span aria-hidden="true">♥</span><small>냥이찜</small><b id="favoriteCount">0</b></button>
+    <button class="install-trigger" type="button"><span aria-hidden="true">⇩</span><small>설치</small></button>
   </nav>
 
   <dialog id="guideDialog">
     <form method="dialog" class="dialog-card">
       <button class="dialog-close" aria-label="닫기">×</button>
-      <span class="dialog-icon" aria-hidden="true">🐱</span>
+      <span class="dialog-icon" aria-hidden="true"><img src="./app-icon.png?v=20260911" alt=""></span>
       <h2>냥이와 안전하게 보기</h2>
       <ol>
         <li><strong>소리는 작게 시작</strong><span>새소리나 쥐 소리에 과하게 흥분하지 않는지 살펴봐요.</span></li>
@@ -152,6 +160,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <noscript><p class="noscript">냥이 영상 목록을 보려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
-  <script src="./app.js?v=20260910-100"></script>
+  <script src="./app.js?v=20260911-pwa"></script>
 </body>
 </html>

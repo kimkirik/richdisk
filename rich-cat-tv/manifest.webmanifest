@@ -1,0 +1,15 @@
+{
+  "name": "냥이TV",
+  "short_name": "냥이TV",
+  "description": "고양이를 위한 100개의 영상 추천 채널",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#25113f",
+  "theme_color": "#25113f",
+  "icons": [
+    {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "./app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
