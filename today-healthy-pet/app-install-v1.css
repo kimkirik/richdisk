@@ -61,7 +61,9 @@
 .pet-install-preview { border-radius: 24px; box-shadow: 0 8px 24px #a4673526; }
 #pet-install-dialog .pet-install-eyebrow { margin: 18px 0 5px; color: #98603b; font-size: 12px; font-weight: 750; }
 #pet-install-title { margin: 0; font-size: 25px; letter-spacing: -.05em; }
+#pet-install-dialog .pet-install-icon-label { margin: 6px 0 0; color: #936344; font-size: 12px; }
 #pet-install-description { margin: 8px 0 21px; color: #806d60; font-size: 14px; line-height: 1.6; }
+#pet-install-feedback { padding: 12px 14px; margin: 14px 0; background: #f8eee2; border-radius: 12px; color: #73533c; font-size: 13px; line-height: 1.6; }
 #pet-install-guide { padding: 17px 18px; border-radius: 18px; background: #f8eee2; text-align: left; }
 #pet-install-guide h3 { margin: 0 0 10px; font-size: 14px; }
 #pet-install-guide ol { margin: 0; padding-left: 19px; font-size: 13px; line-height: 1.7; word-break: keep-all; }
@@ -81,6 +83,7 @@
   cursor: pointer;
 }
 #pet-install-now:disabled { opacity: .6; cursor: wait; }
+#pet-install-dialog .pet-install-done { background: #f6ebde; color: #76543e; }
 @media (min-width: 821px) and (max-width: 1150px) {
   .topbar { padding-inline: 18px; gap: 10px; }
   .topbar .brand { font-size: 18px; gap: 7px; }

@@ -5,6 +5,10 @@
   const dialog = document.getElementById('pet-install-dialog');
   const installNow = document.getElementById('pet-install-now');
   const guide = document.getElementById('pet-install-guide');
+  const feedback = document.getElementById('pet-install-feedback');
+  const description = document.getElementById('pet-install-description');
+  const doneButton = dialog.querySelector('.pet-install-done');
+  const installLink = new URL(location.href).searchParams.get('install') === '1';
   const displayMode = window.matchMedia('(display-mode: standalone)');
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -14,8 +18,14 @@
   let installed = false;
   let busy = false;
   let trigger = null;
+  let completionVisible = false;
 
   const isStandalone = () => displayMode.matches || navigator.standalone === true;
+
+  function setFeedback(text) {
+    feedback.textContent = text;
+    feedback.hidden = !text;
+  }
 
   function renderGuide() {
     const lines = inApp ? [
@@ -54,19 +64,35 @@
     if (trigger) {
       trigger.hidden = hide;
       trigger.disabled = busy;
-      trigger.setAttribute('aria-label', pendingPrompt ? '오늘도 건강하개 앱 추가' : '오늘도 건강하개 홈 화면 추가 안내');
-      trigger.setAttribute('aria-haspopup', pendingPrompt ? 'false' : 'dialog');
+      trigger.setAttribute('aria-label', '리치 아이콘으로 앱 설치');
+      trigger.setAttribute('aria-haspopup', 'dialog');
     }
     installNow.hidden = !pendingPrompt || hide;
     installNow.disabled = busy;
-    guide.hidden = !!pendingPrompt;
-    if (hide && dialog.open) dialog.close();
+    guide.hidden = !!pendingPrompt || completionVisible;
+    if (isStandalone() && dialog.open) dialog.close();
   }
 
   function showGuide() {
+    if (installed || isStandalone()) return;
+    completionVisible = false;
+    description.textContent = '앱을 설치하면 이 리치 아이콘으로 바로 실행할 수 있어요.';
+    doneButton.textContent = '나중에 할게요';
     renderGuide();
     sync();
-    if (!dialog.open && !installed && !isStandalone()) dialog.showModal();
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function showComplete() {
+    completionVisible = true;
+    busy = false;
+    description.textContent = '앱 추가를 마쳤어요. 새 리치 아이콘으로 시작해보세요.';
+    setFeedback(android || ios
+      ? '홈 화면이나 앱 목록에서 ‘건강하개’를 찾아 눌러주세요.'
+      : '컴퓨터의 앱 목록 또는 Dock에서 ‘건강하개’를 찾아 실행해주세요.');
+    doneButton.textContent = '확인했어요';
+    sync();
+    if (!dialog.open && !isStandalone()) dialog.showModal();
   }
 
   async function requestInstall() {
@@ -75,14 +101,22 @@
     const prompt = pendingPrompt;
     pendingPrompt = null;
     busy = true;
+    setFeedback('');
     if (dialog.open) dialog.close();
     sync();
     try {
       await prompt.prompt();
       // Only appinstalled confirms completion; dismissing must allow a retry.
-      await prompt.userChoice;
+      const choice = await prompt.userChoice;
+      if (!installed) {
+        showGuide();
+        setFeedback(choice.outcome === 'accepted'
+          ? '설치 요청을 보냈어요. 브라우저가 설치를 마치면 홈 화면이나 앱 목록에서 새 아이콘을 확인해주세요.'
+          : '설치를 취소했어요. 준비되면 브라우저 메뉴에서 다시 추가할 수 있어요.');
+      }
     } catch {
       showGuide();
+      setFeedback('설치 창을 열지 못했어요. 아래 방법으로 홈 화면에 추가해주세요.');
     } finally {
       busy = false;
       sync();
@@ -97,7 +131,7 @@
   window.addEventListener('appinstalled', () => {
     installed = true;
     pendingPrompt = null;
-    sync();
+    showComplete();
   });
   displayMode.addEventListener('change', sync);
   window.addEventListener('pageshow', sync);
@@ -128,9 +162,9 @@
     icon.width = 28;
     icon.height = 28;
     const label = document.createElement('span');
-    label.textContent = '앱 추가';
+    label.textContent = '앱 설치';
     trigger.append(icon, label);
-    trigger.addEventListener('click', requestInstall);
+    trigger.addEventListener('click', () => { setFeedback(''); showGuide(); });
     actions.prepend(trigger);
     sync();
     return true;
@@ -142,5 +176,20 @@
       if (mountButton()) observer.disconnect();
     });
     observer.observe(root, { childList: true, subtree: true });
+  }
+
+  if (installLink) {
+    const showWhenReady = () => {
+      if (isStandalone()) return;
+      if (!trigger || document.querySelector('.launch-screen') || document.querySelector('#root [role="dialog"]')) {
+        setTimeout(showWhenReady, 250);
+        return;
+      }
+      showGuide();
+      const url = new URL(location.href);
+      url.searchParams.delete('install');
+      history.replaceState(history.state, '', url);
+    };
+    showWhenReady();
   }
 })();

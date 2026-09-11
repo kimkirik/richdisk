@@ -11,11 +11,11 @@
     <link rel="manifest" href="./manifest.webmanifest?v=rich-care-1" />
     <link rel="icon" type="image/png" sizes="32x32" href="./icons/rich-care-v1-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/rich-care-v1-180.png" />
-    <script defer src="./app-install-v1.js"></script>
+    <script defer src="./app-install-v1.js?v=install-2"></script>
     <title>오늘도 건강하개</title>
     <script type="module" crossorigin src="/richdisk/today-healthy-pet/assets/index-diary-ca55de72b7.js"></script>
     <link rel="stylesheet" crossorigin href="/richdisk/today-healthy-pet/assets/index-DH_isI2z.css">
-    <link rel="stylesheet" href="./app-install-v1.css" />
+    <link rel="stylesheet" href="./app-install-v1.css?v=install-2" />
     <link rel="stylesheet" href="./diary-alert-v1.css" />
     <script type="module" src="./diary-alert-v1.js"></script>
   </head>
@@ -24,13 +24,15 @@
     <dialog id="pet-install-dialog" aria-labelledby="pet-install-title" aria-describedby="pet-install-description">
       <button type="button" class="pet-install-close" aria-label="앱 추가 안내 닫기">×</button>
       <img class="pet-install-preview" src="./icons/rich-care-v1-192.png" width="88" height="88" alt="하트를 안고 있는 리치 아이콘" />
-      <p class="pet-install-eyebrow">매일 만나는 우리 아이</p>
+      <p class="pet-install-eyebrow">홈 화면에서 만날 새 아이콘</p>
       <h2 id="pet-install-title">오늘도 건강하개</h2>
-      <p id="pet-install-description">홈 화면에서 리치의 하루를 바로 열어요.</p>
-      <button type="button" id="pet-install-now" hidden>홈 화면에 앱 추가</button>
+      <p class="pet-install-icon-label">홈 화면 이름 · 건강하개</p>
+      <p id="pet-install-description">앱을 설치하면 이 리치 아이콘으로 바로 실행할 수 있어요.</p>
+      <button type="button" id="pet-install-now" hidden>이 아이콘으로 앱 설치</button>
+      <p id="pet-install-feedback" role="status" hidden></p>
       <div id="pet-install-guide"></div>
       <p class="pet-install-note">추가한 뒤에는 새 리치 아이콘을 눌러 시작하세요.</p>
-      <button type="button" class="pet-install-done">확인했어요</button>
+      <button type="button" class="pet-install-done">나중에 할게요</button>
     </dialog>
   </body>
 </html>
