@@ -29,10 +29,17 @@
   const koreanTitle=video=>video.titleKo||`${video.countryKo||"세계"} ${video.category||"재난"} 관련 영상`;
   const shownTitle=video=>state.language==="original"?originalOf(video):koreanTitle(video);
   const publishedTime=video=>{
-    const parsed=Date.parse(video.publishedAt||`${video.year||1970}-01-01T00:00:00Z`);
-    return Number.isNaN(parsed)?0:parsed;
+    const parsed=Date.parse(video.publishedAt||"");
+    return Number.isFinite(parsed)&&parsed<=Date.now()&&parsed>=Date.UTC(2005,0,1)?parsed:0;
   };
-  const publishedLabel=video=>video.publishedAt?video.publishedAt.slice(0,10).replaceAll("-","."):String(video.year||"날짜 미상");
+  const publishedLabel=video=>{
+    const time=publishedTime(video);if(!time)return "게시일 미상";
+    const age=Date.now()-time;
+    if(age<36e5)return `${Math.max(1,Math.floor(age/6e4))}분 전`;
+    if(age<864e5)return `${Math.floor(age/36e5)}시간 전`;
+    if(age<7*864e5)return `${Math.floor(age/864e5)}일 전`;
+    return new Date(time).toLocaleDateString("ko-KR");
+  };
   const compact=value=>new Intl.NumberFormat("ko-KR",{notation:"compact",maximumFractionDigits:1}).format(Number(value)||0);
   const text=(tag,className,value)=>{const node=document.createElement(tag);if(className)node.className=className;if(value!==undefined)node.textContent=value;return node};
 
@@ -49,7 +56,7 @@
     if(state.category==="전체")list=[...new Map(list.map(video=>[video.youtubeId,video])).values()];
     return list.sort((a,b)=>{
       if(state.sort==="latest")return publishedTime(b)-publishedTime(a);
-      if(state.sort==="oldest")return publishedTime(a)-publishedTime(b);
+      if(state.sort==="oldest")return (publishedTime(a)||Infinity)-(publishedTime(b)||Infinity);
       if(state.sort==="views")return (Number(b.viewCount)||0)-(Number(a.viewCount)||0)||publishedTime(b)-publishedTime(a);
       if(state.sort==="comments")return (Number(b.commentCount)||0)-(Number(a.commentCount)||0)||(Number(b.viewCount)||0)-(Number(a.viewCount)||0);
       return (Number(a.rank)||9999)-(Number(b.rank)||9999)||publishedTime(b)-publishedTime(a);
@@ -90,9 +97,14 @@
     els.title.textContent=`${state.category==="전체"?"재난 영상":state.category} TOP ${top.length}`;
     els.languageNotice.textContent=state.language==="ko"?"외국어 제목은 한글로 표시하고 원제도 함께 보여줍니다.":"영상 제목을 게시된 원문 그대로 표시합니다.";
     const categoryPool=state.category==="전체"?videos:videos.filter(video=>video.category===state.category);
-    const generated=payload.generatedAt?new Date(payload.generatedAt).toLocaleString("ko-KR",{dateStyle:"medium",timeStyle:"short"}):"백업 목록";
+    const status=payload.categoryStatus?.[state.category];
+    const checkedAt=status?.checkedAt||payload.generatedAt;
+    const generated=checkedAt?new Date(checkedAt).toLocaleString("ko-KR",{dateStyle:"medium",timeStyle:"short"}):"백업 목록";
     const completeness=state.category!=="전체"&&categoryPool.length<100?` · 현재 ${categoryPool.length}/100개, 자동 갱신 대기 중`:"";
-    els.dataState.querySelector("span").textContent=`개인 API 키 없이 갱신 · ${generated}${completeness}`;
+    const recent=new Set(categoryPool.filter(video=>publishedTime(video)>Date.now()-7*864e5).map(video=>video.youtubeId)).size;
+    const stale=checkedAt&&Date.now()-Date.parse(checkedAt)>12*36e5;
+    const warning=status?.searchSucceeded===false?" · 이번 검색 실패로 이전 목록 유지":stale?" · 갱신 지연: 저장된 목록 표시 중":"";
+    els.dataState.querySelector("span").textContent=`최근 7일 영상 ${recent}개 · 목록 확인 ${generated} · ${payload.refreshHours||12}시간 간격 자동 검색${completeness}${warning}`;
   }
 
   els.candidateCount.textContent=compact(payload.candidateCount||videos.length);

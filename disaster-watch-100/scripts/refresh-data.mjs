@@ -1,11 +1,10 @@
-import {writeFile} from "node:fs/promises";
-import {fileURLToPath} from "node:url";
+import {readFile,writeFile} from "node:fs/promises";
+import {fileURLToPath,pathToFileURL} from "node:url";
 import {dirname,join} from "node:path";
 
 const ROOT=dirname(dirname(fileURLToPath(import.meta.url)));
 const OUTPUT=join(ROOT,"data.js");
 const MAX_PER_CATEGORY=120;
-const MAX_SEARCH_PAGES=5;
 const SEARCH_CONCURRENCY=6;
 const CATEGORY_CONCURRENCY=3;
 const TRANSLATE_CONCURRENCY=4;
@@ -49,8 +48,7 @@ function needsKorean(value){return [...value].some(character=>/\p{L}/u.test(char
 function usefulTranslation(original,translated){return translated&&translated.trim()!==original.trim()&&/[가-힣]/.test(translated)}
 
 async function timedFetch(url,options={},timeout=4500){
-  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);
-  try{return await fetch(url,{...options,signal:controller.signal,headers:{accept:"application/json","accept-language":"en-US,en;q=.8","user-agent":"Mozilla/5.0 DisasterWatchUpdater/1.0",...(options.headers||{})}})}finally{clearTimeout(timer)}
+  return fetch(url,{...options,signal:AbortSignal.timeout(timeout),headers:{accept:"application/json","accept-language":"en-US,en;q=.8","user-agent":"Mozilla/5.0 DisasterWatchUpdater/1.0",...(options.headers||{})}});
 }
 
 async function mapLimit(values,limit,worker){
@@ -75,31 +73,77 @@ function parseRenderer(item,category,rank){
   return {category,originalTitle:title,titleKo:"",countryKo:countryOf(title),year:date?Number(date.slice(0,4)):0,youtubeId:id,channel:clean(rendererText(item.ownerText)||rendererText(item.longBylineText))||"YouTube",publishedAt:date,viewCount:compactViews(rendererText(item.viewCountText)),rank,isLive:true};
 }
 
-function datedQuery(query,page){if(page===1)return query;const end=new Date().getUTCFullYear()+1-(page-2)*4;return `${query} after:${Math.max(2005,end-4)}-01-01 before:${end}-01-01`}
-async function youtubeFallback(query,category,page,rankBase){
-  const url=new URL("https://www.youtube.com/results");url.searchParams.set("search_query",datedQuery(query,page));url.searchParams.set("sp","EgIQAQ==");url.searchParams.set("hl","en");url.searchParams.set("gl","US");
+export function youtubeFilter(date="",sort="relevance",page=1){
+  // Public Invidious search filters: today/week/month + relevance/views.
+  const dateCodes={today:2,week:3,month:4,year:5};
+  const filters=[...(dateCodes[date]?[8,dateCodes[date]]:[]),16,1];
+  return Buffer.from([...(sort==="views"?[8,3]:[]),18,filters.length,...filters,...(page>1?[72,(page-1)*20]:[])]).toString("base64");
+}
+async function youtubeFallback(query,category,options,rankBase){
+  const url=new URL("https://www.youtube.com/results");url.searchParams.set("search_query",query);url.searchParams.set("sp",youtubeFilter(options.date,options.sort,options.page));url.searchParams.set("hl","en");url.searchParams.set("gl","US");
   try{const response=await timedFetch(url,{headers:{accept:"text/html"}},5500);if(!response.ok)return[];const html=await response.text();return extractObjects(html,'"videoRenderer":').flatMap((raw,index)=>{try{const video=parseRenderer(JSON.parse(raw),category,rankBase+index);return video?[video]:[]}catch{return[]}})}catch{return[]}
 }
 
-async function searchOne(query,category,page,rankBase){
-  const start=hash(`${category}:${page}:${query}`)%INVIDIOUS.length;
+async function searchOne(query,category,options,rankBase){
+  const {page=1,date="",sort="relevance"}=options;
+  const start=hash(`${category}:${date}:${page}:${query}`)%INVIDIOUS.length;
   for(let rotation=0;rotation<2;rotation++){
     const base=INVIDIOUS[(start+rotation)%INVIDIOUS.length];const url=new URL("/api/v1/search",base);
-    url.searchParams.set("q",query);url.searchParams.set("type","video");url.searchParams.set("page",String(page));url.searchParams.set("sort_by",page===1?"relevance":page===2?"upload_date":"view_count");
+    url.searchParams.set("q",query);url.searchParams.set("type","video");url.searchParams.set("page",String(page));url.searchParams.set("sort",sort);url.searchParams.set("hl","en");if(date)url.searchParams.set("date",date);
     try{const response=await timedFetch(url,{},3500);if(!response.ok)continue;const json=await response.json();if(!Array.isArray(json))continue;const videos=json.map((item,index)=>parseInvidious(item,category,rankBase+index)).filter(Boolean).map(video=>({...video,_commentsBase:base}));if(videos.length)return videos}catch{}
   }
-  return youtubeFallback(query,category,page,rankBase);
+  return youtubeFallback(query,category,options,rankBase);
 }
 
-async function searchCategory(category,categoryQueries){
-  const pool=new Map();let candidateCount=0,rankBase=1;
-  for(let page=1;page<=MAX_SEARCH_PAGES&&pool.size<MAX_PER_CATEGORY;page++){
-    const batches=await mapLimit(categoryQueries,SEARCH_CONCURRENCY,(query,index)=>searchOne(query,category,page,rankBase+index*40));
-    for(const videos of batches.filter(Boolean)){candidateCount+=videos.length;for(const video of videos){const current=pool.get(video.youtubeId);if(!current||video.viewCount>current.viewCount)pool.set(video.youtubeId,current?{...video,rank:current.rank}:video)}}
-    rankBase+=categoryQueries.length*40;
+export function videoTime(video,now=Date.now()){
+  const time=Date.parse(video.publishedAt||"");
+  return Number.isFinite(time)&&time<=now&&time>=Date.UTC(2005,0,1)?time:0;
+}
+export function selectPool(fresh,previous=[],now=Date.now()){
+  const pool=new Map(previous.map(video=>[video.youtubeId,{...video}]));
+  for(const video of fresh){
+    const old=pool.get(video.youtubeId);
+    pool.set(video.youtubeId,{...old,...video,
+      publishedAt:videoTime(video,now)?video.publishedAt:old?.publishedAt||null,
+      titleKo:old?.originalTitle===video.originalTitle?old.titleKo:video.titleKo,
+      commentCount:old?.commentCount??video.commentCount??null,
+      viewCount:Math.max(old?.viewCount||0,video.viewCount||0),rank:old?.rank||video.rank});
   }
-  const videos=[...pool.values()].sort((a,b)=>a.rank-b.rank).slice(0,MAX_PER_CATEGORY).map((video,index)=>({...video,rank:index+1}));
-  console.log(`${category}: ${videos.length} unique / ${candidateCount} candidates`);return {videos,candidateCount};
+  const all=[...pool.values()];const selected=new Map();
+  const take=(compare,count)=>[...all].sort(compare).slice(0,count).forEach(video=>selected.set(video.youtubeId,video));
+  take((a,b)=>videoTime(b,now)-videoTime(a,now),MAX_PER_CATEGORY);
+  take((a,b)=>(b.viewCount||0)-(a.viewCount||0),100);
+  take((a,b)=>(b.commentCount||0)-(a.commentCount||0),100);
+  take((a,b)=>(videoTime(a,now)||Infinity)-(videoTime(b,now)||Infinity),100);
+  take((a,b)=>(a.rank||9999)-(b.rank||9999),100);
+  return [...selected.values()];
+}
+export async function searchCategory(category,categoryQueries,previous=[],search=searchOne){
+  const pool=new Map();let candidateCount=0,rankBase=1;
+  const collect=async options=>{
+    const batches=await mapLimit(categoryQueries,SEARCH_CONCURRENCY,(query,index)=>search(query,category,options,rankBase+index*40));
+    const maxAge={today:864e5,week:7*864e5,month:31*864e5,year:366*864e5}[options.date];
+    for(const videos of batches.filter(Boolean)){candidateCount+=videos.length;for(const video of videos){
+      // Do not let an upstream server ignoring date filters fill the fresh quota.
+      if(maxAge&&(!videoTime(video)||Date.now()-videoTime(video)>maxAge))continue;
+      const current=pool.get(video.youtubeId);pool.set(video.youtubeId,current?{...current,...video,publishedAt:videoTime(video)?video.publishedAt:current.publishedAt,rank:Math.min(current.rank,video.rank)}:video);
+    }}
+    rankBase+=categoryQueries.length*40;
+  };
+  // Always search BOTH recent windows, even when today's batch fills 120 slots.
+  await collect({date:"today",sort:"relevance",page:1});
+  await collect({date:"week",sort:"relevance",page:1});
+  const datedCount=()=>[...pool.values()].filter(video=>videoTime(video)>0).length;
+  if(datedCount()<MAX_PER_CATEGORY)await collect({date:"month",sort:"relevance",page:1});
+  if(datedCount()<MAX_PER_CATEGORY)await collect({date:"month",sort:"relevance",page:2});
+  if(datedCount()<MAX_PER_CATEGORY)await collect({date:"year",sort:"relevance",page:1});
+  // Retain older popular records for other sort modes without displacing fresh ones.
+  await collect({date:"",sort:"views",page:1});
+  const videos=selectPool([...pool.values()],previous);
+  const lastDay=videos.filter(video=>videoTime(video)>Date.now()-864e5).length;
+  const lastWeek=videos.filter(video=>videoTime(video)>Date.now()-7*864e5).length;
+  console.log(`${category}: ${videos.length} saved / ${candidateCount} candidates / 24h ${lastDay} / 7d ${lastWeek}`);
+  return {videos,candidateCount,category,checkedAt:candidateCount?new Date().toISOString():null,lastDay,lastWeek};
 }
 
 async function edgeChunk(items){
@@ -113,7 +157,8 @@ async function googleOne(title){
   return null;
 }
 async function translate(videos){
-  const foreign=[...new Map(videos.filter(video=>needsKorean(video.originalTitle)).map(video=>[video.originalTitle,video])).values()];const translations=new Map();
+  const translations=new Map(videos.filter(video=>usefulTranslation(video.originalTitle,video.titleKo)&&!video.titleKo.endsWith(" 관련 영상")).map(video=>[video.originalTitle,video.titleKo]));
+  const foreign=[...new Map(videos.filter(video=>needsKorean(video.originalTitle)&&!translations.has(video.originalTitle)).map(video=>[video.originalTitle,video])).values()];
   const chunks=Array.from({length:Math.ceil(foreign.length/16)},(_,index)=>foreign.slice(index*16,index*16+16));
   const edgeResults=await mapLimit(chunks,TRANSLATE_CONCURRENCY,edgeChunk);for(const result of edgeResults.filter(Boolean))for(const [key,value] of result)translations.set(key,value);
   const missing=foreign.filter(video=>!translations.has(video.originalTitle));
@@ -130,19 +175,25 @@ async function loadCommentCounts(videos){
   const values=await mapLimit(videos,COMMENT_CONCURRENCY,async video=>{
     const bases=[video._commentsBase,...INVIDIOUS].filter((value,index,array)=>value&&array.indexOf(value)===index);
     for(const base of bases){const count=await commentCountFrom(base,video.youtubeId);if(count!==null){found++;return count}}
-    return 0;
+    return null;
   });
-  console.log(`Comment counts: ${found}/${videos.length}`);return new Map(videos.map((video,index)=>[video.youtubeId,values[index]||0]));
+  console.log(`Comment counts: ${found}/${videos.length}`);return new Map(videos.map((video,index)=>[video.youtubeId,values[index]]));
 }
 
 async function main(){
-  const categoryResults=await mapLimit(Object.entries(queries),CATEGORY_CONCURRENCY,([category,categoryQueries])=>searchCategory(category,categoryQueries));
+  let previous={videos:[],categoryStatus:{}};
+  try{const source=await readFile(OUTPUT,"utf8");previous=JSON.parse(source.slice("window.DISASTER_DATA=".length).replace(/;\s*$/,""))}catch{}
+  const entries=Object.entries(queries);
+  const categoryResults=await mapLimit(entries,CATEGORY_CONCURRENCY,async([category,categoryQueries])=>searchCategory(category,categoryQueries,previous.videos.filter(video=>video.category===category)));
+  for(let i=0;i<categoryResults.length;i++)if(!categoryResults[i])categoryResults[i]={category:entries[i][0],videos:previous.videos.filter(video=>video.category===entries[i][0]),candidateCount:0,checkedAt:null};
   const rawVideos=categoryResults.flatMap(result=>result.videos);const candidateCount=categoryResults.reduce((sum,result)=>sum+result.candidateCount,0);
-  const sufficientlyComplete=Object.keys(queries).filter(category=>rawVideos.filter(video=>video.category===category).length>=100).length;
-  if(rawVideos.length<1300||sufficientlyComplete!==Object.keys(queries).length)throw new Error(`Public search was incomplete: ${rawVideos.length} videos, ${sufficientlyComplete} complete categories`);
-  const [translated,commentCounts]=await Promise.all([translate(rawVideos),loadCommentCounts(rawVideos)]);
-  const videos=translated.map(({_commentsBase,...video})=>({...video,commentCount:commentCounts.get(video.youtubeId)||0}));const payload={schema:1,generatedAt:new Date().toISOString(),candidateCount,source:"public-search",videos};
+  if(!candidateCount)throw new Error("No public search results; preserving the last successful index");
+  const needingComments=[...new Map(rawVideos.filter(video=>video.commentCount==null).map(video=>[video.youtubeId,video])).values()];
+  const [translated,commentCounts]=await Promise.all([translate(rawVideos),loadCommentCounts(needingComments)]);
+  const videos=translated.map(({_commentsBase,...video})=>({...video,commentCount:commentCounts.get(video.youtubeId)??video.commentCount??null}));
+  const categoryStatus=Object.fromEntries(categoryResults.map(result=>[result.category,{checkedAt:result.checkedAt||previous.categoryStatus?.[result.category]?.checkedAt||previous.generatedAt||null,newestAt:[...result.videos].sort((a,b)=>videoTime(b)-videoTime(a))[0]?.publishedAt||null,searchSucceeded:!!result.checkedAt}]));
+  const payload={schema:2,generatedAt:new Date().toISOString(),candidateCount,source:"public-search",refreshHours:3,categoryStatus,videos};
   await writeFile(OUTPUT,`window.DISASTER_DATA=${JSON.stringify(payload)};\n`,"utf8");console.log(`Wrote ${videos.length} videos to ${OUTPUT}`);
 }
 
-main().catch(error=>{console.error(error);process.exitCode=1});
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{console.error(error);process.exitCode=1});

@@ -3,12 +3,13 @@ name: Update Disaster Watch Data
 on:
   workflow_dispatch:
   schedule:
-    - cron: "23 */12 * * *"
+    - cron: "23 */3 * * *"
   push:
     branches: [main]
     paths:
       - "disaster-watch-100/scripts/refresh-data.mjs"
       - ".github/workflows/update-disaster-watch.yml"
+      - "disaster-watch-100/scripts/refresh-data.test.mjs"
 
 permissions:
   contents: write
@@ -23,9 +24,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Check recent search behavior
+        run: node --test disaster-watch-100/scripts/refresh-data.test.mjs
       - name: Refresh public video index
         run: node disaster-watch-100/scripts/refresh-data.mjs
       - name: Save refreshed index
