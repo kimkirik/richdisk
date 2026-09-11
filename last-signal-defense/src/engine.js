@@ -5,8 +5,9 @@ import {
   pointAt,
   pathLength,
   wavePlan,
-} from "./data.js?v=20260909-resume";
+} from "./data.js?v=20260911-flow";
 export const STEP = 1 / 60;
+export const WAVE_BREAK = 2;
 export function createGame(stageId = 1) {
   const stage = STAGES[stageId - 1];
   if (!stage) throw new RangeError("Unknown stage");
@@ -21,6 +22,7 @@ export function createGame(stageId = 1) {
     energy: stage.budget,
     wave: 0,
     waveTime: 0,
+    nextWaveIn: null,
     plan: [],
     spawnIndex: 0,
     towers: [],
@@ -114,6 +116,7 @@ export function startWave(g) {
   g.wave++;
   g.phase = "combat";
   g.waveTime = 0;
+  g.nextWaveIn = null;
   g.spawnIndex = 0;
   g.plan = wavePlan(g.stage, g.wave);
   emit(g, "wave", { wave: g.wave });
@@ -171,11 +174,15 @@ export function skill(g, kind) {
 export function spawnEnemy(g, item) {
   const d = ENEMIES[item.kind],
     path = g.stage.paths[item.lane];
-  const scale = g.stage.hpScale * (1 + (g.wave - 1) * 0.13);
+  const scale =
+    g.stage.hpScale * (1 + (g.wave - 1) * 0.13) * (item.strength ?? 1);
   const p = path[0];
   const e = {
     id: g.nextId++,
     kind: item.kind,
+    name: item.name || d.name,
+    rewardScale: item.strength ?? 1,
+    coreDamage: Math.round(d.damage * (item.strength ?? 1)),
     lane: item.lane,
     distance: 0,
     length: pathLength(path),
@@ -185,14 +192,14 @@ export function spawnEnemy(g, item) {
     maxHp: d.hp * scale,
     shield: (d.shield || 0) * scale,
     maxShield: (d.shield || 0) * scale,
-    speed: d.speed * g.stage.speedScale,
+    speed: (item.speed ?? d.speed) * g.stage.speedScale,
     stun: 0,
     slow: 0,
     burn: 0,
     flash: 0,
   };
   g.enemies.push(e);
-  if (d.boss) emit(g, "boss", { name: d.name });
+  if (d.boss) emit(g, "boss", { name: e.name });
   return e;
 }
 export function tick(g, dt = STEP) {
@@ -200,6 +207,10 @@ export function tick(g, dt = STEP) {
   g.time += dt;
   for (const k in g.cooldowns)
     g.cooldowns[k] = Math.max(0, g.cooldowns[k] - dt);
+  if (g.phase === "build" && g.nextWaveIn !== null) {
+    g.nextWaveIn = Math.max(0, g.nextWaveIn - dt);
+    if (g.nextWaveIn <= 1e-8) startWave(g);
+  }
   if (g.phase === "combat") {
     g.waveTime += dt;
     while (
@@ -229,7 +240,7 @@ export function tick(g, dt = STEP) {
     Object.assign(e, pointAt(g.stage.paths[e.lane], e.distance));
     if (e.distance >= e.length) {
       e.escaped = true;
-      g.core = Math.max(0, g.core - ENEMIES[e.kind].damage);
+      g.core = Math.max(0, g.core - e.coreDamage);
       emit(g, "corehit", { ...g.stage.core, color: "#ff736b" });
       g.status = "코어 피격 · 전선을 보강하세요";
     }
@@ -322,7 +333,7 @@ export function tick(g, dt = STEP) {
     if (e.hp <= 0 && !e.escaped) {
       g.kills++;
       const reward = Math.round(
-        ENEMIES[e.kind].reward * (1 + g.stage.id * 0.025),
+        ENEMIES[e.kind].reward * e.rewardScale * (1 + g.stage.id * 0.025),
       );
       g.energy += reward;
       g.score += reward * 10;
@@ -349,10 +360,11 @@ export function tick(g, dt = STEP) {
   ) {
     g.energy += 85 + g.stage.id * 8;
     g.phase = g.wave === 3 ? "victory" : "build";
+    g.nextWaveIn = g.phase === "build" ? WAVE_BREAK : null;
     g.status =
       g.wave === 3
         ? "구역 확보 · 다음 스테이지 진입 가능"
-        : "공세 방어 성공 · 보급 도착";
+        : "보급 도착 · 다음 공세 자동 진입";
     emit(g, g.phase === "victory" ? "victory" : "clear");
   }
 }

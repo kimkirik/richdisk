@@ -91,14 +91,15 @@ export function run(id) {
     if (frames % 30 === 0) {
       let n = 0;
       while (n++ < 20 && buy());
-      if (g.phase === "build") startWave(g);
+      if (g.phase === "build" && g.wave === 0) startWave(g);
       if (g.core <= 70) skill(g, "repair");
-      if (g.enemies.length >= 5) skill(g, "emp");
-      if (
-        g.enemies.length >= 9 ||
-        g.enemies.some((e) => e.kind === "titan" || e.kind === "sovereign")
-      )
-        skill(g, "airstrike");
+      const bossThreat = g.enemies.some(
+        (e) =>
+          ["titan", "sovereign"].includes(e.kind) &&
+          e.distance > e.length * 0.25,
+      );
+      if (g.enemies.length >= 5 || bossThreat) skill(g, "emp");
+      if (g.enemies.length >= 9 || bossThreat) skill(g, "airstrike");
     }
     boss = g.enemies.find((e) => e.kind === "sovereign")
       ? { ...g.enemies.find((e) => e.kind === "sovereign") }

@@ -163,7 +163,7 @@ export const ENEMIES = {
     atlas: 5,
     color: "#ff674d",
     armor: 0.18,
-    unlock: 4,
+    unlock: 1,
     boss: true,
   },
   swarm: {
@@ -603,6 +603,7 @@ export const STAGES = specs.map(
         480 +
         index * 48 +
         Math.max(0, index - 11) * 80 +
+        (index >= 16 ? 240 + (index - 16) * 120 : 0) +
         (index === 19 ? 450 : 0),
       boss: (index + 1) % 4 === 0,
       seed: (index + 1) * 19283,
@@ -627,11 +628,19 @@ export function wavePlan(stage, wave) {
       at: i * Math.max(0.34, 0.88 - stage.id * 0.018 - wave * 0.035),
     });
   }
-  if (stage.boss && wave === 3)
-    plan.push({
-      kind: stage.id === 20 ? "sovereign" : "titan",
-      lane: 1 % stage.paths.length,
-      at: count * 0.55,
-    });
+  const commander = stage.boss && wave === 3;
+  plan.push({
+    kind: stage.id === 20 && wave === 3 ? "sovereign" : "titan",
+    name: commander
+      ? undefined
+      : ["선봉 타이탄", "돌격 타이탄", "타이탄 지휘관"][wave - 1],
+    strength: commander
+      ? 1
+      : Math.min(0.72, 0.12 + stage.id * 0.012 + (wave - 1) * 0.1),
+    speed: commander ? undefined : 36,
+    lane: (commander ? 1 : wave) % stage.paths.length,
+    // Enter with the main force so the wave does not end in a long empty wait.
+    at: plan.at(-1).at * 0.45,
+  });
   return plan.sort((a, b) => a.at - b.at);
 }

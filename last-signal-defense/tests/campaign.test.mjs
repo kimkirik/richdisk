@@ -41,7 +41,7 @@ test("20 distinct maps have connected paths and valid separated build pads", () 
     }
   }
 });
-test("stage-based unlocks, mixed waves, escalating stats and five bosses", () => {
+test("stage-based unlocks, mixed waves, escalating stats and a balanced boss in every wave", () => {
   assert.equal(Object.keys(TOWERS).length, 8);
   assert.equal(Object.keys(ENEMIES).length, 12);
   for (const s of STAGES) {
@@ -49,10 +49,7 @@ test("stage-based unlocks, mixed waves, escalating stats and five bosses", () =>
       const plan = wavePlan(s, w);
       assert.ok(plan.every((e) => ENEMIES[e.kind].unlock <= s.id));
       if (s.id >= 3) assert.ok(new Set(plan.map((e) => e.kind)).size >= 3);
-      assert.equal(
-        plan.filter((e) => ENEMIES[e.kind].boss).length,
-        s.boss && w === 3 ? 1 : 0,
-      );
+      assert.equal(plan.filter((e) => ENEMIES[e.kind].boss).length, 1);
       if (s.id === 20 && w === 3)
         assert.equal(
           plan.at(-1).kind === "sovereign" ||
@@ -253,4 +250,53 @@ test("a completed third wave emits victory once; restart resets combat and speed
   assert.equal(fresh.wave, 0);
   assert.deepEqual(fresh.towers, []);
   assert.equal(fresh.core, 100);
+});
+
+test("waves continue automatically once, while initial setup and pauses wait for the player", () => {
+  const g = createGame(1);
+  for (let i = 0; i < 180; i++) advance(g, 1 / 60);
+  assert.equal(g.wave, 0);
+  startWave(g);
+  g.plan = [];
+  tick(g);
+  assert.equal(g.phase, "build");
+  assert.equal(g.nextWaveIn, 2);
+  const supplied = g.energy;
+  g.paused = true;
+  for (let i = 0; i < 180; i++) advance(g, 1 / 60);
+  assert.equal(g.nextWaveIn, 2);
+  g.paused = false;
+  for (let i = 0; i < 119; i++) advance(g, 1 / 60);
+  assert.equal(g.wave, 1);
+  advance(g, 1 / 60);
+  assert.equal(g.wave, 2);
+  assert.equal(g.phase, "combat");
+  assert.equal(g.nextWaveIn, null);
+  assert.equal(g.energy, supplied);
+  assert.equal(g.events.filter((e) => e.type === "wave").length, 2);
+  assert.equal(startWave(g), false);
+});
+
+test("auto-wave delay follows game speed, can be skipped, and keeps boss stats proportional", () => {
+  for (const speed of [1, 2, 3]) {
+    const g = createGame(1);
+    g.phase = "combat";
+    g.wave = 1;
+    tick(g);
+    setSpeed(g, speed);
+    for (let i = 0; i < 120 / speed; i++) advance(g, 1 / 60);
+    assert.equal(g.wave, 2);
+  }
+  const g = createGame(1);
+  g.phase = "combat";
+  g.wave = 1;
+  tick(g);
+  assert.ok(startWave(g));
+  assert.equal(g.nextWaveIn, null);
+  const item = wavePlan(g.stage, 1).find((e) => ENEMIES[e.kind].boss);
+  const boss = spawnEnemy(g, item);
+  assert.ok(boss.maxHp < ENEMIES.titan.hp);
+  assert.ok(boss.coreDamage < ENEMIES.titan.damage);
+  assert.equal(boss.rewardScale, item.strength);
+  assert.ok(boss.name.includes("타이탄"));
 });

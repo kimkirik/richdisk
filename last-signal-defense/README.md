@@ -1,11 +1,11 @@
 # LAST SIGNAL — 20 SECTOR CAMPAIGN
 
-A dependency-free tactical tower defense game for GitHub Pages.
+A dependency-free tactical tower defense game, hosted independently on Sites and Vercel. GitHub is a source backup only.
 
 ## Play
 
 - 20 distinct maps across five regions: flooded city, polar facilities, molten industry, biohazard zone and orbital void.
-- Each stage contains three waves. Commanders appear in stages 4, 8, 12 and 16; the Void Sovereign appears in stage 20.
+- Each stage contains three continuous waves. After initial deployment, waves 2 and 3 begin automatically after a two-second game-time supply break. Every wave includes a scaled Titan; stages 4, 8, 12 and 16 end with a full commander, and stage 20 ends with the Void Sovereign.
 - Eight defense machines: Gatling, Cryo, Tesla, Missile, Railgun, Plasma, Siege Cannon and Nova Core. Later machines unlock as stages advance.
 - Twelve enemy types include fast swarms, shield walkers, phasing specters, repair drones and armored siege units.
 - Select a machine, then tap a `+` pad. Select a built machine to upgrade or recover 70% of invested energy.
@@ -33,7 +33,7 @@ From this folder:
 python3 -m http.server 4173
 ```
 
-Open `http://localhost:4173/`. The same files also work under `/richdisk/last-signal-defense/` on GitHub Pages.
+Open `http://localhost:4173/`. Relative assets also support deployments under `/richdisk/last-signal-defense/`.
 
 ## Verification
 
@@ -42,12 +42,12 @@ node --test tests/*.test.mjs
 node tests/balance-pilot.mjs
 ```
 
-41 regression tests cover all 20 maps and 60 waves, stage unlocks, speed equivalence, pause guards, delayed missile damage, armor penetration, distinct tower effects, skill conditions, rewards, restart, endings and visibility recovery. The balance pilot uses the same engine and resource constraints as a player; it is evidence that every stage is clearable, not a replacement for human difficulty testing.
+43 regression tests cover all 20 maps and 60 waves, stage unlocks, speed equivalence, pause guards, delayed missile damage, armor penetration, distinct tower effects, skill conditions, rewards, restart, endings, visibility recovery, automatic wave timing and pause guards. The balance pilot uses the same engine and resource constraints as a player; it is evidence that every stage is clearable, not a replacement for human difficulty testing.
 
 Responsive browser checks: 1363×936, 390×844, 320×568 and 844×390. Campaign stage completion, next-stage unlock and persistence after reload were also exercised through the actual UI.
 
 ## Mobile view and orchestral score
 
-Portrait phones display the entire battlefield with a 90-degree camera turn. Roads and placement points keep their geometry; buildings, units and labels remain upright. At 390×844 the map occupies about three quarters of the viewport area, with 12–19px primary labels and compact icons. Landscape phones use a compact control sidebar.
+Portrait phones display the entire battlefield with a 90-degree camera turn. Roads and placement points keep their geometry; buildings, units and labels remain upright. At 390×844 the map occupies about three quarters of the viewport area, with 12–19px primary labels and compact icons. Landscape phones use a 124px control sidebar and the full remaining rectangle for the battlefield (about 85% of an 844×390 viewport). Units stay proportional, towers are larger, regular enemies are about 1.5× larger, and bosses have a readable health HUD. Announcements no longer cover the middle of combat.
 
 Music begins on the first deliberate interaction. The ♪ button toggles music and effects. Three synchronized 48-second orchestral stems blend between preparation, battle and boss encounters. Music keeps its original tempo at 1×/2×/3×, pauses with the game or hidden tab, and resumes without stacking players. Audio downloads only after interaction (about 1.73 MB total). Instrument credits are in `assets/music/CREDITS.md`.

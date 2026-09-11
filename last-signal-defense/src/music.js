@@ -3,7 +3,9 @@ export const SCORE_SECONDS = 48;
 export const STEMS = ["foundation", "battle", "boss"];
 export function scoreMix(game) {
   if (game.phase === "victory") return [0, 0, 0];
-  const combat = game.phase === "combat";
+  const combat =
+    game.phase === "combat" ||
+    (game.phase === "build" && game.nextWaveIn != null);
   const boss = game.enemies.some((enemy) =>
     ["titan", "sovereign"].includes(enemy.kind),
   );

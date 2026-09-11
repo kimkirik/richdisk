@@ -1,11 +1,11 @@
-import { cameraMatrix, upright } from "./viewport.js?v=20260909-resume";
+import { cameraMatrix, upright } from "./viewport.js?v=20260911-flow";
 import {
   BIOMES,
   TOWERS,
   ENEMIES,
   pathDistance,
-} from "./data.js?v=20260909-resume";
-import { towerStats } from "./engine.js?v=20260909-resume";
+} from "./data.js?v=20260911-flow";
+import { towerStats } from "./engine.js?v=20260911-flow";
 const advancedTowerImage = new Image();
 advancedTowerImage.src = new URL(
   "../assets/advanced-towers.webp",
@@ -877,11 +877,16 @@ export class Renderer {
     for (const u of units) {
       ctx.save();
       upright(ctx, u.x, u.y, portrait);
-      if (portrait) {
-        ctx.translate(u.x, u.y);
-        ctx.scale(1.12, 1.12);
-        ctx.translate(-u.x, -u.y);
-      }
+      const unitScale = u.tower
+        ? portrait || this.canvas.clientHeight <= 540
+          ? 1.3
+          : 1.15
+        : 1;
+      ctx.translate(u.x, u.y);
+      // Keep units undistorted when a landscape phone uses the full available map.
+      const aspectCorrection = portrait ? 1 : H / 720 / (W / 1280);
+      ctx.scale(unitScale * aspectCorrection, unitScale);
+      ctx.translate(-u.x, -u.y);
       if (u.tower) {
         const d = TOWERS[u.kind];
         glow(ctx, u.x, u.y, 36, d.color, 0.13);
@@ -926,12 +931,12 @@ export class Renderer {
       } else {
         const d = ENEMIES[u.kind],
           size = d.boss
-            ? 105
+            ? 164
             : ["brute", "siege"].includes(u.kind)
-              ? 68
+              ? 98
               : u.kind === "shield"
-                ? 56
-                : 48;
+                ? 84
+                : 76;
         ctx.save();
         if (u.stun > 0) {
           ctx.strokeStyle = "#b4afff";
@@ -997,7 +1002,7 @@ export class Renderer {
           ctx.fillStyle = "#ffd0bb";
           ctx.font = "bold 11px monospace";
           ctx.textAlign = "center";
-          ctx.fillText(d.name, u.x, u.y - size * 0.67 - 17);
+          ctx.fillText(u.name || d.name, u.x, u.y - size * 0.67 - 17);
         }
       }
       ctx.restore();
@@ -1154,7 +1159,7 @@ export class Renderer {
       ctx.save();
       ctx.globalAlpha = Math.max(0, 0.6 * (1 - t / 1.5));
       upright(ctx, fallen.x, fallen.y, portrait);
-      const size = fallen.boss ? 105 : 55;
+      const size = fallen.boss ? 164 : 76;
       const rect = enemyRects[fallen.kind];
       if (
         rect &&
@@ -1170,10 +1175,25 @@ export class Renderer {
           size,
           size * 0.84,
         );
-      else if (ENEMIES[fallen.kind].atlas !== undefined && this.monsters.complete && this.monsters.naturalWidth) {
+      else if (
+        ENEMIES[fallen.kind].atlas !== undefined &&
+        this.monsters.complete &&
+        this.monsters.naturalWidth
+      ) {
         const index = ENEMIES[fallen.kind].atlas;
-        const sw = this.monsters.naturalWidth / 3, sh = this.monsters.naturalHeight / 2;
-        ctx.drawImage(this.monsters, (index % 3) * sw, Math.floor(index / 3) * sh, sw, sh, fallen.x - size / 2, fallen.y - size * .68, size, size);
+        const sw = this.monsters.naturalWidth / 3,
+          sh = this.monsters.naturalHeight / 2;
+        ctx.drawImage(
+          this.monsters,
+          (index % 3) * sw,
+          Math.floor(index / 3) * sh,
+          sw,
+          sh,
+          fallen.x - size / 2,
+          fallen.y - size * 0.68,
+          size,
+          size,
+        );
       }
       ctx.restore();
       glow(
