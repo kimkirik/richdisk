@@ -1,6 +1,6 @@
-import { EndingSequence, campaignSummary } from "./ending.js?v=20260911-flow";
-import { STAGES } from "./data.js?v=20260911-flow";
-import { paintMap } from "./renderer.js?v=20260911-flow";
+import { EndingSequence, campaignSummary } from "./ending.js?v=20260911-fullmap";
+import { STAGES } from "./data.js?v=20260911-fullmap";
+import { paintMap } from "./renderer.js?v=20260911-fullmap";
 
 export class EndingPresentation {
   constructor(audio, { onResult, onMaps, onReplay }) {

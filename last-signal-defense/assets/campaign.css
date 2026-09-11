@@ -2334,3 +2334,324 @@ dialog::backdrop {
     min-height: 27px;
   }
 }
+
+/* In landscape the map owns the viewport; tools float above it on demand. */
+.landscape-dock {
+  display: none;
+}
+@media (orientation: landscape) {
+  .campaign-shell {
+    position: relative;
+    display: block;
+    padding: 0;
+    height: 100dvh;
+  }
+  .combat-layout {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+  }
+  .arena {
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .board {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    top: 50%;
+  }
+  .intel-panel,
+  .mobile-heading,
+  .mobile-stats,
+  .status-line {
+    display: none;
+  }
+  .command-bar {
+    position: absolute;
+    z-index: 4;
+    inset: env(safe-area-inset-top) env(safe-area-inset-right) auto
+      env(safe-area-inset-left);
+    height: 40px;
+    padding: 3px 8px;
+    gap: 6px;
+    border: 0;
+    background: transparent;
+    pointer-events: none;
+  }
+  .command-bar button {
+    pointer-events: auto;
+    background: #071720ed;
+  }
+  .wordmark {
+    padding: 0;
+  }
+  .wordmark > span:last-child,
+  .stage-resource {
+    display: none;
+  }
+  .brand-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+  .resource-bar {
+    height: 34px;
+    margin: 0 auto 0 0;
+    flex: 0 1 220px;
+    gap: 4px;
+  }
+  .resource {
+    min-width: 0;
+    padding: 2px 7px;
+    gap: 0 6px;
+    flex: 1;
+    background: #071720e8;
+    border: 1px solid var(--line);
+  }
+  .resource > span {
+    font-size: 12px;
+    letter-spacing: 0;
+  }
+  .resource b {
+    font-size: 18px;
+  }
+  .top-controls {
+    margin-left: auto;
+    gap: 4px;
+  }
+  .square {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+  .operation-bar {
+    position: absolute;
+    z-index: 5;
+    top: calc(3px + env(safe-area-inset-top));
+    right: calc(88px + env(safe-area-inset-right));
+    left: auto;
+    width: auto;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .operation-bar > span,
+  .tempo > span {
+    display: none;
+  }
+  .tempo {
+    gap: 3px;
+  }
+  .tempo button {
+    width: 35px;
+    height: 34px;
+    font-size: 14px;
+    background: #071720ed;
+  }
+  .tempo button[aria-pressed="true"] {
+    background: #16444fe8;
+  }
+  .battle-readout {
+    top: calc(43px + env(safe-area-inset-top));
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+  .build-hit {
+    width: clamp(34px, 3.8cqw, 46px);
+  }
+  .landscape-dock {
+    position: absolute;
+    z-index: 5;
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: calc(6px + env(safe-area-inset-bottom));
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .landscape-dock .deployment-controls {
+    width: 160px;
+    display: block;
+  }
+  .landscape-dock .selection-info {
+    display: none;
+  }
+  #toggle-armory {
+    height: 38px;
+    padding: 5px 10px;
+    min-width: 76px;
+    background: #0b2935ef;
+    border: 1px solid #81e6e97a;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  #toggle-armory[aria-expanded="true"] {
+    background: #22515b;
+  }
+  #wave-button {
+    min-height: 38px;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    gap: 4px;
+    font-size: 14px;
+    background: #10444ced;
+  }
+  #wave-button span {
+    font-size: 12px;
+  }
+  #wave-button:disabled {
+    opacity: 0.85;
+  }
+  #tower-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 3px;
+  }
+  #tower-actions button {
+    min-height: 38px;
+    padding: 3px 5px;
+    font-size: 14px;
+    background: #102936ef;
+  }
+  #tower-actions #upgrade {
+    flex: 1;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+  #tower-actions #deselect {
+    min-width: 25px;
+  }
+  .landscape-dock .tactical-skills {
+    position: fixed;
+    top: calc(43px + env(safe-area-inset-top));
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    width: auto;
+    transform: none;
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+  }
+  .tactical-skills button {
+    width: 36px;
+    min-height: 34px;
+    padding: 3px;
+    gap: 0;
+    justify-content: center;
+    background: #09212bee;
+  }
+  .tactical-skills i {
+    display: block;
+    font-size: 22px;
+    line-height: 1;
+  }
+  .tactical-skills span,
+  .tactical-skills small,
+  .tactical-skills b {
+    display: none;
+  }
+  .tactical-skills button.cooling i {
+    display: none;
+  }
+  .tactical-skills button.cooling b {
+    display: block;
+    margin: 0;
+    font-size: 12px;
+  }
+  .campaign-shell:not(.armory-open) .armory {
+    display: none;
+  }
+  .armory {
+    position: absolute;
+    z-index: 6;
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: calc(50px + env(safe-area-inset-bottom));
+    width: min(
+      420px,
+      calc(100% - 16px - env(safe-area-inset-left) - env(safe-area-inset-right))
+    );
+    padding: 8px;
+    border: 1px solid #7ce9ed6b;
+    border-radius: 8px;
+    background: #061823f5;
+    box-shadow: 0 8px 32px #0009;
+  }
+  .armory-heading {
+    display: flex;
+    height: 30px;
+    flex-direction: row;
+    justify-content: space-between;
+    margin: 0 0 6px;
+    gap: 8px;
+  }
+  .armory-heading > span {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0;
+  }
+  .armory-heading > span b {
+    display: none;
+  }
+  .armory-heading > div:not(.tactical-skills) {
+    display: flex;
+    width: auto;
+    gap: 3px;
+  }
+  .armory-heading button {
+    min-height: 28px;
+    padding: 3px 10px;
+    font-size: 14px;
+  }
+  .armory-body {
+    display: block;
+  }
+  .tower-deck {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: none;
+    gap: 5px;
+  }
+  .tower-card {
+    display: block;
+    height: 64px;
+    aspect-ratio: auto;
+    padding: 0;
+  }
+  .tower-icon {
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    left: 3px;
+    top: 3px;
+  }
+  .tower-name {
+    position: absolute;
+    left: 5px;
+    top: 28px;
+    font-size: 14px;
+    line-height: 17px;
+    white-space: nowrap;
+  }
+  .tower-name small {
+    display: none;
+  }
+  .tower-card > b {
+    position: absolute;
+    left: 5px;
+    bottom: 3px;
+    font-size: 12px;
+    line-height: 14px;
+  }
+  .battle-banner.compact {
+    bottom: calc(50px + env(safe-area-inset-bottom));
+  }
+}

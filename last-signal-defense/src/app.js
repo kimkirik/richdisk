@@ -1,9 +1,9 @@
-import { OrchestralAudio } from "./music.js?v=20260911-flow";
-import { bindPageLifecycle } from "./lifecycle.js?v=20260911-flow";
-import { recordVictory } from "./ending.js?v=20260911-flow";
-import { EndingPresentation } from "./ending-ui.js?v=20260911-flow";
-import { PORTRAIT_QUERY, padPercent } from "./viewport.js?v=20260911-flow";
-import { STAGES, BIOMES, TOWERS, ENEMIES } from "./data.js?v=20260911-flow";
+import { OrchestralAudio } from "./music.js?v=20260911-fullmap";
+import { bindPageLifecycle } from "./lifecycle.js?v=20260911-fullmap";
+import { recordVictory } from "./ending.js?v=20260911-fullmap";
+import { EndingPresentation } from "./ending-ui.js?v=20260911-fullmap";
+import { PORTRAIT_QUERY, padPercent } from "./viewport.js?v=20260911-fullmap";
+import { STAGES, BIOMES, TOWERS, ENEMIES } from "./data.js?v=20260911-fullmap";
 import {
   createGame,
   advance,
@@ -15,8 +15,12 @@ import {
   setSpeed,
   towerStats,
   upgradeCost,
-} from "./engine.js?v=20260911-flow";
-import { Renderer, paintMap, towerIcon } from "./renderer.js?v=20260911-flow";
+} from "./engine.js?v=20260911-fullmap";
+import {
+  Renderer,
+  paintMap,
+  towerIcon,
+} from "./renderer.js?v=20260911-fullmap";
 const $ = (s) => document.querySelector(s);
 const STORAGE = "last-signal-campaign-v2";
 let progress = { unlocked: 1, stars: {} },
@@ -55,7 +59,8 @@ root.innerHTML = `
 <div class="operation-bar"><span><i class="online-dot"></i><b id="sector-name"></b><em id="practice-label"></em></span><div class="tempo"><span>SPEED</span><button data-speed="1" aria-label="1배속" aria-pressed="true">1×</button><button data-speed="2" aria-label="2배속" aria-pressed="false">2×</button><button data-speed="3" aria-label="3배속" aria-pressed="false">3×</button></div></div>
 <section class="combat-layout"><aside class="intel-panel"><p class="eyebrow" id="biome-name"></p><h1 id="map-name"></h1><p id="brief"></p><div class="progress-heading"><span>공세</span><strong id="wave">0 / 3</strong></div><div class="wave-segments"><i></i><i></i><i></i></div><dl class="stats"><div><dt>격파</dt><dd id="kills">0</dd></div><div><dt>전장 적군</dt><dd id="enemies">0</dd></div><div><dt>점수</dt><dd id="score">0</dd></div></dl><div class="threat-info"><span>예상 위협</span><strong id="threats"></strong></div><button class="outline-action" id="maps-button">20개 작전 구역 <span>↗</span></button><div class="network-status"><i class="online-dot"></i>LAST SIGNAL NETWORK<br><small>연결을 유지하십시오.</small></div></aside>
 <div class="arena"><div class="mobile-heading"><p class="eyebrow" id="mobile-biome"></p><h2 id="mobile-name"></h2><span id="mobile-brief"></span></div><div class="board"><canvas id="battle-canvas" aria-label="방어 전장"></canvas><div id="pads" aria-label="방어기 건설 지점"></div><div class="battle-readout"><span id="wave-readout"></span><strong id="next-wave" role="status"></strong><div id="boss-hud" hidden><span id="boss-name"></span><b id="boss-health"></b><i><em id="boss-meter"></em></i></div></div><div id="battle-banner" class="battle-banner" role="status" aria-live="polite"><span></span><strong></strong><small></small></div><div id="paused-overlay" class="paused-overlay" hidden><span>OPERATION PAUSED</span><strong>작전 일시정지</strong><button id="resume">계속하기 ▷</button></div></div><div class="mobile-stats"><div><span>공세</span><b id="mobile-wave"></b></div><div><span>격파</span><b id="mobile-kills"></b></div><div><span>적군</span><b id="mobile-enemies"></b></div><div><span>점수</span><b id="mobile-score"></b></div></div><div class="tactical-skills" aria-label="필살기"><button data-skill="airstrike"><i>✦</i><span>궤도 폭격<small>전 구역 타격</small></span><b></b></button><button data-skill="emp"><i>⌁</i><span>광역 EMP<small>4.5초 정지</small></span><b></b></button><button data-skill="repair"><i>✚</i><span>코어 복구<small>내구도 +30</small></span><b></b></button></div><p id="status" class="status-line" role="status"></p></div></section>
-<footer class="armory"><div class="armory-heading"><span>DEFENSE SYSTEMS <b id="deck-count">01 — 04</b></span><div><button data-deck="0" aria-pressed="true">기본 Ⅰ</button><button data-deck="1" aria-pressed="false">특수 Ⅱ</button></div></div><div class="armory-body"><div class="tower-deck" aria-label="방어기 선택"></div><div class="deployment-controls"><div class="selection-info"><span id="selected-label">개틀링</span><small id="selected-desc"></small></div><button id="wave-button" class="primary-action">공세 1 시작 <span>▷</span></button><div id="tower-actions" hidden><button id="upgrade">강화</button><button id="sell">회수</button><button id="deselect" aria-label="타워 선택 해제">×</button></div></div></div></footer>
+<footer class="armory" id="armory-panel"><div class="armory-heading"><span>DEFENSE SYSTEMS <b id="deck-count">01 — 04</b></span><div><button data-deck="0" aria-pressed="true">기본 Ⅰ</button><button data-deck="1" aria-pressed="false">특수 Ⅱ</button></div></div><div class="armory-body"><div class="tower-deck" aria-label="방어기 선택"></div><div class="deployment-controls"><div class="selection-info"><span id="selected-label">개틀링</span><small id="selected-desc"></small></div><button id="wave-button" class="primary-action">공세 1 시작 <span>▷</span></button><div id="tower-actions" hidden><button id="upgrade">강화</button><button id="sell">회수</button><button id="deselect" aria-label="타워 선택 해제">×</button></div></div></div></footer>
+<div class="landscape-dock"><button id="toggle-armory" aria-expanded="false" aria-controls="armory-panel">방어기 ▴</button></div>
 </main>
 <dialog id="campaign-dialog" class="campaign-dialog"><header><div><span class="eyebrow">OPERATION ATLAS / 20 SECTORS</span><h2>마지막 신호를 향해</h2><p>5개 지역 · 20개 전장 · 구역마다 3차례 공세</p></div><button class="close-dialog" aria-label="스테이지 선택 닫기">×</button></header><div id="stage-grid" class="stage-grid"></div><footer class="stage-detail"><div><strong id="chosen-title"></strong><p id="chosen-description"></p></div><div class="stage-actions"><button id="practice-stage">연습 플레이</button><button id="enter-stage" class="primary-action">캠페인 출격 ▷</button></div><small>연습은 모든 맵에서 가능합니다. 캠페인 진행은 구역을 순서대로 방어하면 저장됩니다.</small></footer></dialog>
 <dialog id="result-dialog" class="result-dialog"><div class="eyebrow" id="result-kicker"></div><h2 id="result-title"></h2><p id="result-detail"></p><div id="result-stars"></div><dl id="result-stats"></dl><button id="result-next" class="primary-action"></button><button id="result-maps" class="outline-action">스테이지 선택</button></dialog>`;
@@ -67,14 +72,30 @@ const ending = new EndingPresentation(music, {
   onReplay: () => enter(g.stage.id, practice),
 });
 const portraitView = matchMedia(PORTRAIT_QUERY);
-const landscapeControls = matchMedia(
-  "(max-height: 540px) and (orientation: landscape)",
-);
+const landscapeControls = matchMedia("(orientation: landscape)");
+function setArmory(open, focusToggle = false) {
+  $(".campaign-shell").classList.toggle("armory-open", open);
+  $("#toggle-armory").setAttribute("aria-expanded", String(open));
+  $("#toggle-armory").textContent = open ? "닫기 ▾" : "방어기 ▴";
+  if (focusToggle && landscapeControls.matches) $("#toggle-armory").focus();
+}
+$("#toggle-armory").onclick = () => {
+  const open = !$(".campaign-shell").classList.contains("armory-open");
+  setArmory(open);
+  if (open) $(".armory [data-deck]").focus();
+};
 function syncMobileControls() {
-  const skills = $(".tactical-skills");
-  if (portraitView.matches || landscapeControls.matches)
-    $(".armory-heading").append(skills);
-  else $(".arena").insertBefore(skills, $("#status"));
+  const skills = $(".tactical-skills"),
+    controls = $(".deployment-controls");
+  setArmory(false);
+  if (landscapeControls.matches) {
+    $(".landscape-dock").prepend(controls);
+    $(".landscape-dock").prepend(skills);
+  } else {
+    $(".armory-body").append(controls);
+    if (portraitView.matches) $(".armory-heading").append(skills);
+    else $(".arena").insertBefore(skills, $("#status"));
+  }
 }
 syncMobileControls();
 landscapeControls.addEventListener("change", syncMobileControls);
@@ -122,6 +143,7 @@ function drawDeck() {
   document.querySelectorAll("[data-tower]").forEach(
     (btn) =>
       (btn.onclick = () => {
+        setArmory(false, true);
         kind = btn.dataset.tower;
         selected = null;
         drawDeck();
@@ -152,6 +174,7 @@ function createPads() {
     button.onmouseleave = () => (hover = null);
     button.onclick = () => {
       if (g.paused) return;
+      setArmory(false);
       const tower = g.towers.find((t) => t.padId === padId);
       if (tower) selected = tower.id;
       else if (build(g, kind, padId)) selected = g.towers.at(-1).id;
@@ -209,6 +232,7 @@ function updateUI() {
           : "매 공세 보스 · 최정예 병력",
   );
   text("#status", g.status);
+  $("#toggle-armory").title = `방어기 선택 · 현재 ${TOWERS[kind].name}`;
   document
     .querySelectorAll(".wave-segments i")
     .forEach((el, i) =>
@@ -280,6 +304,7 @@ function updateUI() {
 }
 function enter(stageId, isPractice = false) {
   ending.dismiss();
+  setArmory(false);
   g = createGame(stageId);
   practice = isPractice;
   selected = null;
@@ -435,6 +460,7 @@ document.querySelectorAll("[data-skill]").forEach(
 );
 $("#wave-button").onclick = () => {
   startWave(g);
+  setArmory(false);
   updateUI();
 };
 $("#upgrade").onclick = () => {
@@ -517,6 +543,7 @@ window.addEventListener("keydown", (e) => {
     updateUI();
   }
   if (e.key === "Escape") {
+    setArmory(false, true);
     selected = null;
     updateUI();
   }

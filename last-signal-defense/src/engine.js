@@ -5,7 +5,7 @@ import {
   pointAt,
   pathLength,
   wavePlan,
-} from "./data.js?v=20260911-flow";
+} from "./data.js?v=20260911-fullmap";
 export const STEP = 1 / 60;
 export const WAVE_BREAK = 2;
 export function createGame(stageId = 1) {

@@ -1,11 +1,11 @@
-import { cameraMatrix, upright } from "./viewport.js?v=20260911-flow";
+import { cameraMatrix, upright } from "./viewport.js?v=20260911-fullmap";
 import {
   BIOMES,
   TOWERS,
   ENEMIES,
   pathDistance,
-} from "./data.js?v=20260911-flow";
-import { towerStats } from "./engine.js?v=20260911-flow";
+} from "./data.js?v=20260911-fullmap";
+import { towerStats } from "./engine.js?v=20260911-fullmap";
 const advancedTowerImage = new Image();
 advancedTowerImage.src = new URL(
   "../assets/advanced-towers.webp",
@@ -877,11 +877,7 @@ export class Renderer {
     for (const u of units) {
       ctx.save();
       upright(ctx, u.x, u.y, portrait);
-      const unitScale = u.tower
-        ? portrait || this.canvas.clientHeight <= 540
-          ? 1.3
-          : 1.15
-        : 1;
+      const unitScale = u.tower ? (portrait ? 1.3 : 1) : 1;
       ctx.translate(u.x, u.y);
       // Keep units undistorted when a landscape phone uses the full available map.
       const aspectCorrection = portrait ? 1 : H / 720 / (W / 1280);
