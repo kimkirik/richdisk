@@ -188,9 +188,9 @@ async function main(){
   for(let i=0;i<categoryResults.length;i++)if(!categoryResults[i])categoryResults[i]={category:entries[i][0],videos:previous.videos.filter(video=>video.category===entries[i][0]),candidateCount:0,checkedAt:null};
   const rawVideos=categoryResults.flatMap(result=>result.videos);const candidateCount=categoryResults.reduce((sum,result)=>sum+result.candidateCount,0);
   if(!candidateCount)throw new Error("No public search results; preserving the last successful index");
-  const needingComments=[...new Map(rawVideos.filter(video=>video.commentCount==null).map(video=>[video.youtubeId,video])).values()];
+  const needingComments=[...new Map(rawVideos.filter(video=>video.commentCount==null||!video.commentCheckedAt||Date.now()-Date.parse(video.commentCheckedAt)>864e5).map(video=>[video.youtubeId,video])).values()];
   const [translated,commentCounts]=await Promise.all([translate(rawVideos),loadCommentCounts(needingComments)]);
-  const videos=translated.map(({_commentsBase,...video})=>({...video,commentCount:commentCounts.get(video.youtubeId)??video.commentCount??null}));
+  const videos=translated.map(({_commentsBase,...video})=>({...video,commentCount:commentCounts.get(video.youtubeId)??video.commentCount??null,commentCheckedAt:commentCounts.get(video.youtubeId)!=null?new Date().toISOString():video.commentCheckedAt||null}));
   const categoryStatus=Object.fromEntries(categoryResults.map(result=>[result.category,{checkedAt:result.checkedAt||previous.categoryStatus?.[result.category]?.checkedAt||previous.generatedAt||null,newestAt:[...result.videos].sort((a,b)=>videoTime(b)-videoTime(a))[0]?.publishedAt||null,searchSucceeded:!!result.checkedAt}]));
   const payload={schema:2,generatedAt:new Date().toISOString(),candidateCount,source:"public-search",refreshHours:3,categoryStatus,videos};
   await writeFile(OUTPUT,`window.DISASTER_DATA=${JSON.stringify(payload)};\n`,"utf8");console.log(`Wrote ${videos.length} videos to ${OUTPUT}`);
