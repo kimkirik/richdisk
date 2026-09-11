@@ -132,6 +132,7 @@ async function allowNotifications() {
   }
   try {
     const permission = await Notification.requestPermission();
+    window.dispatchEvent(new Event('healthy-pet:notification-permission'));
     renderSettings();
     setStatus(permission === 'granted' ? '알림을 허용했어요. 알림 테스트로 확인할 수 있어요.' : '앱 안의 알림은 계속 표시돼요. 시스템 알림은 브라우저 설정에서 허용해주세요.');
   } catch { setStatus('알림 권한을 열지 못했어요. 기본 브라우저에서 다시 시도해주세요.'); }
@@ -168,8 +169,14 @@ function mount() {
   settingsCard.querySelector('[data-diary-allow]').addEventListener('click', allowNotifications);
   settingsCard.querySelector('[data-diary-test]').addEventListener('click', testNotification);
   scroll.prepend(settingsCard);
+  const walkHeading = document.createElement('h3');
+  walkHeading.className = 'diary-walk-heading';
+  walkHeading.textContent = '산책 시간 알림';
+  settingsCard.after(walkHeading);
   const title = document.getElementById('reminder-modal-title');
   if (title) title.textContent = '일지 · 산책 알림';
+  const kicker = document.querySelector('.reminder-modal .section-kicker');
+  if (kicker) kicker.textContent = 'DAILY REMINDER';
   renderSettings();
   void check();
 }

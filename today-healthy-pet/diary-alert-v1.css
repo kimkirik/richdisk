@@ -3,6 +3,7 @@
 .diary-alert-heading img { border-radius: 13px; }
 .diary-alert-heading p { margin: 0 0 4px; color: #9b623e; font-size: 11px; font-weight: 700; }
 .diary-alert-heading h3 { margin: 0; font-size: 18px; }
+.diary-walk-heading { margin: 0 0 14px; font-size: 17px; }
 .diary-alert-toggle, .diary-alert-time { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 700; }
 .diary-alert-toggle { min-height: 44px; }
 .diary-alert-toggle input { width: 24px; height: 24px; accent-color: #cd733d; }
