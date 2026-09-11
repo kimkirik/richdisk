@@ -104,7 +104,7 @@
     const recent=new Set(categoryPool.filter(video=>publishedTime(video)>Date.now()-7*864e5).map(video=>video.youtubeId)).size;
     const stale=checkedAt&&Date.now()-Date.parse(checkedAt)>12*36e5;
     const warning=status?.searchSucceeded===false?" · 이번 검색 실패로 이전 목록 유지":stale?" · 갱신 지연: 저장된 목록 표시 중":"";
-    els.dataState.querySelector("span").textContent=`최근 7일 영상 ${recent}개 · 목록 확인 ${generated} · ${payload.refreshHours||12}시간 간격 자동 검색${completeness}${warning}`;
+    els.dataState.querySelector("span").textContent=`최근 7일 영상 ${recent}개 · 목록 확인 ${generated} · ${payload.refreshHours||3}시간 간격 자동 검색${completeness}${warning}`;
   }
 
   els.candidateCount.textContent=compact(payload.candidateCount||videos.length);
