@@ -1,0 +1,102 @@
+.rich-brand-mark {
+  background-image: url('./icons/rich-care-v1-192.png');
+  background-size: cover;
+}
+.launch-portrait { background-image: url('./icons/rich-care-v1-512.png'); }
+#pet-install-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 5px 12px 5px 6px;
+  border: 1px solid #efbf9e;
+  border-radius: 14px;
+  background: #fff2e6;
+  color: #70432c;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+  cursor: pointer;
+}
+#pet-install-button img { border-radius: 9px; }
+#pet-install-button:hover { background: #ffe6d3; }
+#pet-install-button:focus-visible,
+#pet-install-dialog button:focus-visible { outline: 3px solid #b56232; outline-offset: 3px; }
+#pet-install-button:disabled { opacity: .6; cursor: wait; }
+#pet-install-button[hidden],
+#pet-install-dialog [hidden] { display: none !important; }
+#pet-install-dialog {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  margin: auto;
+  padding: 32px 26px 22px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #ead8c8;
+  border-radius: 28px;
+  background: #fffcf7;
+  color: #49372d;
+  text-align: center;
+  box-shadow: 0 24px 80px #49372d33;
+}
+#pet-install-dialog::backdrop { background: #35261966; backdrop-filter: blur(5px); }
+#pet-install-dialog .pet-install-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #806d60;
+  font-size: 27px;
+  cursor: pointer;
+}
+.pet-install-preview { border-radius: 24px; box-shadow: 0 8px 24px #a4673526; }
+#pet-install-dialog .pet-install-eyebrow { margin: 18px 0 5px; color: #98603b; font-size: 12px; font-weight: 750; }
+#pet-install-title { margin: 0; font-size: 25px; letter-spacing: -.05em; }
+#pet-install-description { margin: 8px 0 21px; color: #806d60; font-size: 14px; line-height: 1.6; }
+#pet-install-guide { padding: 17px 18px; border-radius: 18px; background: #f8eee2; text-align: left; }
+#pet-install-guide h3 { margin: 0 0 10px; font-size: 14px; }
+#pet-install-guide ol { margin: 0; padding-left: 19px; font-size: 13px; line-height: 1.7; word-break: keep-all; }
+#pet-install-guide li + li { margin-top: 8px; }
+#pet-install-dialog .pet-install-note { margin: 16px 0; color: #806d60; font-size: 12px; line-height: 1.6; }
+#pet-install-now, #pet-install-dialog .pet-install-done {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px;
+  border: 0;
+  border-radius: 14px;
+  background: #f2955e;
+  color: #452714;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
+#pet-install-now:disabled { opacity: .6; cursor: wait; }
+@media (min-width: 821px) and (max-width: 1150px) {
+  .topbar { padding-inline: 18px; gap: 10px; }
+  .topbar .brand { font-size: 18px; gap: 7px; }
+  .topbar .nav-item { padding-inline: 10px; font-size: 13px; }
+  .topbar .header-actions { gap: 6px; }
+}
+@media (max-width: 420px) {
+  .topbar { padding-inline: 12px; gap: 6px; }
+  .topbar .brand { font-size: 17px; gap: 7px; }
+  .topbar .header-actions { gap: 6px; }
+  #pet-install-button { gap: 5px; padding-inline: 5px 8px; font-size: 12px; }
+  #pet-install-button img { width: 24px; height: 24px; border-radius: 8px; }
+}
+@media (max-width: 360px) {
+  .topbar { padding-inline: 9px; }
+  .topbar .brand { font-size: 15px; gap: 5px; }
+  .topbar .brand-mark { width: 34px; height: 34px; }
+}
+@media (display-mode: standalone) { #pet-install-button { display: none; } }
