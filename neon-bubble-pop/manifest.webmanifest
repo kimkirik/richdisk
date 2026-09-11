@@ -1,0 +1,26 @@
+{
+  "name": "버블 팝! 네온 아케이드",
+  "short_name": "버블 팝!",
+  "description": "빛나는 버블을 조준해 콤보를 터뜨리는 네온 버블 슈터 게임",
+  "id": "/richdisk/neon-bubble-pop/",
+  "start_url": "/richdisk/neon-bubble-pop/",
+  "scope": "/richdisk/neon-bubble-pop/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#03071d",
+  "theme_color": "#071035",
+  "icons": [
+    {
+      "src": "/richdisk/neon-bubble-pop/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/richdisk/neon-bubble-pop/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
