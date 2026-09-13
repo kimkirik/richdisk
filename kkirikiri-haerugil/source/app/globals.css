@@ -470,3 +470,10 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,su
 .local-species-card > .catch-help { font-size: 14px; line-height: 1.6; color: #526c70; }
 .score-history-note { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: #e1f7f5; }
 .observation-source { display: inline-block; padding: 10px 0; color: #005f70; font-size: 14px; text-decoration: underline; }
+
+/* Shared score ratings, including species, activities and comparison lists. */
+.rating-orb.great,.day-strip b.great,.score-card b.great,.activity-top > b.great,.recommend-list > button > span.great,.species-mini-score.great { background: #078576; }
+.species-mini-score.best { background: #e4a637; }
+.species-mini-score.middle { background: #658f99; }
+.species-mini-score.bad { background: #d06450; }
+.score-card > div { grid-template-columns: 102px minmax(0,1fr); }

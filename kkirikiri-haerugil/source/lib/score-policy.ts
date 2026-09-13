@@ -22,8 +22,16 @@ export function signedPoints(value: number | null | undefined) {
 
 export const SCORE_POLICY_DESCRIPTION = "기본 60점 + 날씨 최대 25점. 4·5·6물 +15점, 9물·조금 −15점, 나머지 물때는 0점. 물색은 약간 흐림 −10점, 많이 흐림 −20점, 커피물 가능성 큼 −30점. 최종 점수는 0~100점입니다.";
 
-export type ScoreRating = "비추" | "보통" | "좋음" | "당장 가야 함";
-/** Lower-inclusive bands: 50, 70 and 85 belong to the next band. */
+export const SCORE_RATING_BANDS = [
+  { min: 0, max: 60, rating: "비추", className: "bad" },
+  { min: 61, max: 70, rating: "보통", className: "middle" },
+  { min: 71, max: 85, rating: "좋음", className: "good" },
+  { min: 86, max: 95, rating: "매우좋음", className: "great" },
+  { min: 96, max: 100, rating: "당장 가야 함", className: "best" },
+] as const;
+export type ScoreRating = typeof SCORE_RATING_BANDS[number]["rating"];
+/** Classify the displayed whole points, including comparison scores with decimals. */
 export function getScoreRating(score: number): ScoreRating {
-  return score >= 85 ? "당장 가야 함" : score >= 70 ? "좋음" : score >= 50 ? "보통" : "비추";
+  const points = Number.isFinite(score) ? Math.round(score) : 0;
+  return SCORE_RATING_BANDS.find(band => points <= band.max)?.rating ?? "당장 가야 함";
 }

@@ -7,7 +7,7 @@ import { createComparisonCache, mapConcurrent } from "../lib/conditions-client";
 import { getMulTtae } from "../lib/tide-calendar";
 import { SPOTS } from "../lib/spots";
 import { getWaterVisibility } from "../lib/water-visibility";
-import { getTideAdjustment, getVisibilityAdjustment, signedPoints, SCORE_POLICY_DESCRIPTION, getScoreRating, type ScoreRating } from "../lib/score-policy";
+import { getTideAdjustment, getVisibilityAdjustment, signedPoints, SCORE_POLICY_DESCRIPTION, SCORE_RATING_BANDS, getScoreRating, type ScoreRating } from "../lib/score-policy";
 import { explainRain, explainWave, explainWind } from "../lib/weather-feel";
 import { tidePointFor } from "../lib/tide-points";
 import { PwaInstallButton } from "./pwa-install-button";
@@ -109,12 +109,7 @@ const CAMPS = [
   { name: "무창포솔원캠핑장", zone: "boryeong", pet: "반려견 불가", type: "일반야영장", note: "무창포항 차량 약 3분", url: "https://gocamping.or.kr/bsite/camp/info/read.do?c_no=7006&viewType=read01" },
 ];
 
-const ratingClass: Record<Conditions["rating"], string> = {
-  "당장 가야 함": "best",
-  좋음: "good",
-  보통: "middle",
-  비추: "bad",
-};
+const ratingClass = Object.fromEntries(SCORE_RATING_BANDS.map(band => [band.rating, band.className])) as Record<ScoreRating, string>;
 
 const RECOMMEND_CANDIDATES = [
   ["gujina",36.85,126.18],["sinduri",36.84,126.19],["hakampo",36.90,126.20],["mallipo",36.79,126.14],
@@ -923,11 +918,11 @@ export default function Home() {
           </div>
           <div className="hero-overall-score" aria-label="해루질 종합점수" aria-live="polite">
             <div className="hero-score-label"><b>해루질 종합점수</b><small>100점 만점 · 참고용 · 안전 보장 아님</small></div>
-            <div className="hero-score-value">{hasOverallScore && data ? <><strong>{data.score}<small>점</small></strong><span>{data.rating}</span></> : previousScore ? <><strong>{previousScore.score}<small>점</small></strong><span>{previousScore.rating}</span></> : <span>{loading ? "확인 중" : "계산 자료 대기"}</span>}</div>
+            <div className="hero-score-value">{hasOverallScore && data ? <><strong>{data.score}<small>점</small></strong><span>{getScoreRating(data.score)}</span></> : previousScore ? <><strong>{previousScore.score}<small>점</small></strong><span>{getScoreRating(previousScore.score)}</span></> : <span>{loading ? "확인 중" : "계산 자료 대기"}</span>}</div>
           </div>
           {(data?.scoreNote && hasOverallScore) && <p className="score-history-note">{data.scoreNote}</p>}
           {previousScore && !hasOverallScore && <p className="score-history-note">이전에 확인한 {previousScore.kind === "observation" ? "관측 참고" : "예보"} 점수 · {new Date(previousScore.checkedAt).toLocaleString("ko-KR", {timeZone:"Asia/Seoul"})} 기록 · {loading ? "새 자료 확인 중" : "새 조회 실패로 이전 기록 표시"}</p>}
-          {date < today && scoreHistory.forecast && hasOverallScore && data?.weather.kind === "observation" && <p className="score-history-note">당시 확인한 예보: {scoreHistory.forecast.score}점 · {scoreHistory.forecast.rating} / 위 점수는 실제 관측으로 다시 계산한 값입니다.</p>}
+          {date < today && scoreHistory.forecast && hasOverallScore && data?.weather.kind === "observation" && <p className="score-history-note">저장된 예보: {scoreHistory.forecast.score}점 · {getScoreRating(scoreHistory.forecast.score)} / 위 점수는 실제 관측으로 다시 계산한 값입니다.</p>}
           <p className="startup-tide-status">{showingSavedTide ? (loading ? "저장된 물때 · 최신 자료 확인 중" : "저장된 물때 · 최신 확인 실패") : data?.tidePreview ? "인근 기준항 먼저 표시 · 선택지점 자료 확인 중" : startupTide ? "확인된 조석예보" : "처음 조회한 자료는 다음 실행부터 바로 표시합니다."}{startupTide?.tideRetrievedAt && <> · 조회 {new Date(startupTide.tideRetrievedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}</>}</p>
           <div className="source-line"><span>⚓ 기준 {displayedTideBasis}</span><span>{startupTide?.tideMethod === "nearby" ? "인근 기준점 참고 · 현지와 차이 있음" : "예측값 · 실시간 현장 수위 아님"}</span></div>
 
@@ -1014,7 +1009,7 @@ export default function Home() {
             <div className="selected-day-detail" aria-live="polite">
               <div className="selected-day-title">
                 <span>참고지수 · 안전 보장 아님</span>
-                <strong>{(!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? data.rating : "계산 자료 대기")} {!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? `${data.score}점` : ""}</strong>
+                <strong>{(!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? getScoreRating(data.score) : "계산 자료 대기")} {!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? `${data.score}점` : ""}</strong>
               </div>
               <p>{loading ? "도착한 자료부터 표시합니다. 참고지수는 전체 자료 확인 후 표시해요." : conditionsError || data?.summary || "상세 자료를 불러오는 중이에요."}</p>
               <p className="metric-tap-hint">👇 궁금한 숫자를 누르면 실제 체감과 물 상태를 설명해요.</p>
@@ -1073,7 +1068,7 @@ export default function Home() {
             const target = SPOTS.find(spotItem => spotItem.id === item.id)!;
             const low = item.data.tides.filter(tide => tide.type === "low").sort((a,b) => a.height - b.height)[0];
             const topRating = top5Rating(item.rankScore);
-            return <button key={item.id} onClick={() => openRecommendation(item.id)}><b>{index + 1}</b><div><strong>{target.name}</strong><small>{item.distance.toFixed(1)}km · 간조 {low?.time ?? "-"} · {low?.height ?? "-"}cm</small></div><span className={ratingClass[topRating]}>{topRating}<small>{item.rankScore.toFixed(1)}점</small></span></button>;
+            return <button key={item.id} onClick={() => openRecommendation(item.id)}><b>{index + 1}</b><div><strong>{target.name}</strong><small>{item.distance.toFixed(1)}km · 간조 {low?.time ?? "-"} · {low?.height ?? "-"}cm</small></div><span className={ratingClass[topRating]}>{topRating}<small>{Math.round(item.rankScore)}점</small></span></button>;
           })}</div>}
         </section>
       </>}
@@ -1094,7 +1089,7 @@ export default function Home() {
             <div className="species-list">
               {species.rows.slice(0, showAllSpecies ? species.rows.length : 5).map((item, index) => {
                 const timeClass = item.timeGuide.preference === "day" ? "time-day" : item.timeGuide.preference === "night" ? "time-night" : "time-either";
-                const scoreClass = item.closed ? "closed-score" : item.score >= 85 ? "high" : item.score >= 70 ? "good" : item.score >= 50 ? "mid" : "low";
+                const scoreClass = item.closed ? "closed-score" : ratingClass[getScoreRating(item.score)];
                 return <details key={item.name} className={`species-item ${item.closed ? "closed" : "open"}`}>
                   <summary>
                     <span className="species-leading"><b className={item.closed ? "closed-position" : ""}>{item.closed ? "제외" : `${index + 1}위`}</b><span className="species-icon"><SpeciesIcon name={item.name} /></span></span>
@@ -1222,11 +1217,8 @@ export default function Home() {
             <a href="https://www.gocamping.or.kr/" target="_blank" rel="noreferrer"><span>⛺</span><div><strong>한국관광공사 고캠핑</strong><small>등록 야영장·반려동물 동반 정보</small></div><b>↗</b></a>
           </section>
           <section className="section-card score-card">
-            <h2>4단계 판단 기준</h2>
-            <div><b className="best">당장 가야 함</b><p>85점 이상~100점</p></div>
-            <div><b className="good">좋음</b><p>70점 이상~85점 미만</p></div>
-            <div><b className="middle">보통</b><p>50점 이상~70점 미만</p></div>
-            <div><b className="bad">비추</b><p>0점 이상~50점 미만</p></div>
+            <h2>{SCORE_RATING_BANDS.length}단계 판단 기준</h2>
+            {[...SCORE_RATING_BANDS].reverse().map(band => <div key={band.rating}><b className={band.className}>{band.rating}</b><p>{band.min}~{band.max}점</p></div>)}
             <p className="formula-note">{SCORE_POLICY_DESCRIPTION}</p>
             <p className="formula-note">바람 10m/s 이상 또는 강한 비가 예상되면 물때 점수와 관계없이 ‘비추’로 제한합니다.</p>
           </section>
