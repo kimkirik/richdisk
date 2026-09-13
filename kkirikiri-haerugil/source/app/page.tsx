@@ -1141,7 +1141,7 @@ export default function Home() {
             </div>
             {species.rows.length > 5 && <button className="show-all-species" type="button" onClick={() => setShowAllSpecies(value => !value)} aria-expanded={showAllSpecies}>{showAllSpecies ? "상위 5종만 보기" : `전체 대상어종 ${species.rows.length}종 보기`}</button>}
           </section>
-          <details className="species-guide"><summary>점수 계산 방식 보기</summary><p>{species.mulLabel} 물때 15% · 실제 조차와 저조위 25% · 생물별 지형 35% · 비·바람·파고와 추천 시간 25%를 반영한 현장 기대도예요. 어획을 보장하는 수치가 아니며 금어기·마을어장 제한이 가장 먼저 적용됩니다.</p></details>
+          <details className="species-guide"><summary>점수 계산 방식 보기</summary><p>4·5·6물 +15점, 9물·조금 −15점, 나머지 물때는 0점이에요. 흐린 물색은 감점하고, 실제 조차·저조위와 생물별 지형·계절·추천 시간도 반영한 현장 기대도예요. 어획을 보장하는 수치가 아니며 금어기·마을어장 제한이 가장 먼저 적용됩니다.</p></details>
           <div className="warning-box"><b>⚠ 마을어장에서는 채취하면 안 될 수 있어요.</b><p>금어기가 아니어도 어촌계 관리구역, 체험어장 운영시간, 금지체장과 도구 제한을 현장에서 꼭 확인하세요.</p></div>
           <section className="section-card species-rank-card">
             <div className="section-title-row"><h2>{formatDay(date)} 생물별 대상지 TOP 5</h2><span>전국 후보 비교</span></div>
@@ -1253,7 +1253,7 @@ export default function Home() {
           </section>
           <section className="section-card score-card">
             <h2>4단계 판단 기준</h2>
-            <div><b className="best">최상</b><p>4·5·6물 가점과 물색·날씨를 합산해 85점 이상</p></div>
+            <div><b className="best">최상</b><p>물때·물색·날씨를 합산해 85점 이상</p></div>
             <div><b className="good">좋음</b><p>대체로 적합하지만 현장 확인이 필요한 날</p></div>
             <div><b className="middle">중간</b><p>노출 시간이나 날씨 중 하나가 아쉬운 날</p></div>
             <div><b className="bad">나쁨</b><p>강풍·강수 또는 물때가 맞지 않아 권하지 않는 날</p></div>

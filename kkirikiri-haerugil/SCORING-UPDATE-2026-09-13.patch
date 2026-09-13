@@ -96,7 +96,7 @@ index ac65c04..918d259 100644
  .facility-search-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 10px; }.facility-search-grid a { min-height: 96px; padding: 12px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #d6e8e6; border-radius: 14px; color: var(--ink); background: #f8fcfb; text-decoration: none; }.facility-search-grid a > span { font-size: 22px; }.facility-search-grid strong { margin-top: 3px; font-size: 13px; }.facility-search-grid small { color: var(--muted); font-size: 10px; }
  .nearby-spot-card > div:last-child { display: grid; grid-template-columns: repeat(2,1fr); gap: 7px; margin-top: 12px; }.nearby-spot-card button { min-width: 0; padding: 11px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #d8e8e7; border-radius: 12px; color: var(--ink); background: #f9fcfb; text-align: left; }.nearby-spot-card button.selected { border-color: var(--sea); background: #e6f7f5; }.nearby-spot-card strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.nearby-spot-card small { color: var(--muted); font-size: 9px; }
 diff --git a/app/page.tsx b/app/page.tsx
-index e33c3cf..9c45752 100644
+index e33c3cf..010d71b 100644
 --- a/app/page.tsx
 +++ b/app/page.tsx
 @@ -5,6 +5,9 @@ import Link from "next/link";
@@ -361,12 +361,21 @@ index e33c3cf..9c45752 100644
            </section>
          </div>
          <section className="recommend-card">
+@@ -1259,7 +1141,7 @@ export default function Home() {
+             </div>
+             {species.rows.length > 5 && <button className="show-all-species" type="button" onClick={() => setShowAllSpecies(value => !value)} aria-expanded={showAllSpecies}>{showAllSpecies ? "상위 5종만 보기" : `전체 대상어종 ${species.rows.length}종 보기`}</button>}
+           </section>
+-          <details className="species-guide"><summary>점수 계산 방식 보기</summary><p>{species.mulLabel} 물때 15% · 실제 조차와 저조위 25% · 생물별 지형 35% · 비·바람·파고와 추천 시간 25%를 반영한 현장 기대도예요. 어획을 보장하는 수치가 아니며 금어기·마을어장 제한이 가장 먼저 적용됩니다.</p></details>
++          <details className="species-guide"><summary>점수 계산 방식 보기</summary><p>4·5·6물 +15점, 9물·조금 −15점, 나머지 물때는 0점이에요. 흐린 물색은 감점하고, 실제 조차·저조위와 생물별 지형·계절·추천 시간도 반영한 현장 기대도예요. 어획을 보장하는 수치가 아니며 금어기·마을어장 제한이 가장 먼저 적용됩니다.</p></details>
+           <div className="warning-box"><b>⚠ 마을어장에서는 채취하면 안 될 수 있어요.</b><p>금어기가 아니어도 어촌계 관리구역, 체험어장 운영시간, 금지체장과 도구 제한을 현장에서 꼭 확인하세요.</p></div>
+           <section className="section-card species-rank-card">
+             <div className="section-title-row"><h2>{formatDay(date)} 생물별 대상지 TOP 5</h2><span>전국 후보 비교</span></div>
 @@ -1371,10 +1253,11 @@ export default function Home() {
            </section>
            <section className="section-card score-card">
              <h2>4단계 판단 기준</h2>
 -            <div><b className="best">최상</b><p>간조·조차 조건이 좋고 바람과 비가 안전 범위</p></div>
-+            <div><b className="best">최상</b><p>4·5·6물 가점과 물색·날씨를 합산해 85점 이상</p></div>
++            <div><b className="best">최상</b><p>물때·물색·날씨를 합산해 85점 이상</p></div>
              <div><b className="good">좋음</b><p>대체로 적합하지만 현장 확인이 필요한 날</p></div>
              <div><b className="middle">중간</b><p>노출 시간이나 날씨 중 하나가 아쉬운 날</p></div>
              <div><b className="bad">나쁨</b><p>강풍·강수 또는 물때가 맞지 않아 권하지 않는 날</p></div>
@@ -376,14 +385,15 @@ index e33c3cf..9c45752 100644
            <div className="danger-box"><strong>해루질 지수는 안전을 보장하지 않아요.</strong><p>출발 전 기상특보와 현장 통제 여부를 다시 확인하고, 반드시 2인 이상 활동하며 들물 전에 철수하세요.</p></div>
 diff --git a/lib/score-policy.ts b/lib/score-policy.ts
 new file mode 100644
-index 0000000..4e8ab7e
+index 0000000..d27bf0b
 --- /dev/null
 +++ b/lib/score-policy.ts
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,23 @@
 +/** Community preference, not a scientific prediction of catch or safety. */
 +export function getTideAdjustment(mulLabel: string): number | null {
 +  if (["4물", "5물", "6물"].includes(mulLabel)) return 15;
-+  if (/^(?:[1-9]|1[0-3])물$/.test(mulLabel) || mulLabel === "조금" || mulLabel === "무시") return -15;
++  if (mulLabel === "9물" || mulLabel === "조금") return -15;
++  if (/^(?:[1-9]|1[0-3])물$/.test(mulLabel) || mulLabel === "무시") return 0;
 +  return null;
 +}
 +
@@ -401,7 +411,7 @@ index 0000000..4e8ab7e
 +  return value == null ? "미확인" : `${value > 0 ? "+" : ""}${value}점`;
 +}
 +
-+export const SCORE_POLICY_DESCRIPTION = "기본 60점 + 날씨 최대 25점. 4·5·6물만 +15점, 나머지 물때는 −15점. 물색은 약간 흐림 −10점, 많이 흐림 −20점, 커피물 가능성 큼 −30점. 최종 점수는 0~100점입니다.";
++export const SCORE_POLICY_DESCRIPTION = "기본 60점 + 날씨 최대 25점. 4·5·6물 +15점, 9물·조금 −15점, 나머지 물때는 0점. 물색은 약간 흐림 −10점, 많이 흐림 −20점, 커피물 가능성 큼 −30점. 최종 점수는 0~100점입니다.";
 diff --git a/lib/spots.ts b/lib/spots.ts
 new file mode 100644
 index 0000000..84b20ec
@@ -554,7 +564,7 @@ index 0000000..f017c52
 +}
 diff --git a/tests/score-policy.test.mjs b/tests/score-policy.test.mjs
 new file mode 100644
-index 0000000..0666137
+index 0000000..6f621fe
 --- /dev/null
 +++ b/tests/score-policy.test.mjs
 @@ -0,0 +1,96 @@
@@ -566,8 +576,8 @@ index 0000000..0666137
 +import { SPOTS } from '../lib/spots.ts';
 +
 +test('only 4, 5 and 6 mul earn points across every supported phase', () => {
-+  const labels = [...Array.from({length: 13}, (_, i) => `${i + 1}물`), '조금', '무시'];
-+  for (const label of labels) assert.equal(getTideAdjustment(label), ['4물', '5물', '6물'].includes(label) ? 15 : -15, label);
++  const expected = {'1물':0,'2물':0,'3물':0,'4물':15,'5물':15,'6물':15,'7물':0,'8물':0,'9물':-15,'10물':0,'11물':0,'12물':0,'13물':0,'조금':-15,'무시':0};
++  for (const [label, points] of Object.entries(expected)) assert.equal(getTideAdjustment(label), points, label);
 +  for (const label of ['확인', '', '14물']) assert.equal(getTideAdjustment(label), null);
 +});
 +
@@ -624,15 +634,15 @@ index 0000000..0666137
 +  }
 +}
 +
-+test('built API uses selected-date mul, negative off-cycle points, and the displayed terrain estimate', () => scenario('phases', async call => {
-+  for (const label of ['3물','4물','5물','6물','7물','조금','무시']) {
++test('built API distinguishes preferred, penalized and neutral phases using the selected date', () => scenario('phases', async call => {
++  for (const [label, points, total] of [['3물',0,85],['4물',15,100],['5물',15,100],['6물',15,100],['7물',0,85],['9물',-15,70],['조금',-15,70],['무시',0,85]]) {
 +    const date = dates.find(day => getMulTtae(day) === label);
 +    assert.ok(date, label);
 +    const data = await call({date, rain:0, wind:0, wave:0});
 +    assert.equal(data.live, true);
 +    assert.equal(data.mulTtae, label);
-+    assert.equal(data.scoreBreakdown.tide, ['4물','5물','6물'].includes(label) ? 15 : -15);
-+    assert.equal(data.score, ['4물','5물','6물'].includes(label) ? 100 : 70);
++    assert.equal(data.scoreBreakdown.tide, points);
++    assert.equal(data.score, total);
 +    const terrain = SPOTS.find(spot => spot.source === 'anheung').terrain;
 +    assert.deepEqual(data.waterVisibility, getWaterVisibility(data, terrain));
 +    assert.equal(data.scoreBreakdown.visibility, getVisibilityAdjustment(data.waterVisibility.level));
