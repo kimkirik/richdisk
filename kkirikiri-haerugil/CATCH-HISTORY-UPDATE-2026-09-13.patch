@@ -1,0 +1,1046 @@
+diff --git a/app/api/conditions/route.ts b/app/api/conditions/route.ts
+index 6822bb9..6c841e8 100644
+--- a/app/api/conditions/route.ts
++++ b/app/api/conditions/route.ts
+@@ -3,10 +3,11 @@ import { finiteNumber, summarizeForecast, toKmaGrid } from "../../../lib/conditi
+ import { TIDE_POINT_ASSIGNMENTS } from "../../../lib/tide-points";
+ import { createAsyncCache } from "../../../lib/async-cache";
+ import { progressiveResponse } from "../../../lib/progressive-response";
++import { parseDailyObservations, parseElementObservations, parseHourlyWind } from "../../../lib/historical-weather";
+ import { getMulTtae } from "../../../lib/tide-calendar";
+ import { SPOTS } from "../../../lib/spots";
+ import { getWaterVisibility } from "../../../lib/water-visibility";
+-import { getTideAdjustment, getVisibilityAdjustment } from "../../../lib/score-policy";
++import { getTideAdjustment, getVisibilityAdjustment, getScoreRating } from "../../../lib/score-policy";
+ 
+ type ConditionsPayload = { live: boolean; sourceStatus: { tide: boolean; weather: boolean; recentRain: boolean; recentRainOfficial: boolean }; [key: string]: unknown };
+ const conditionsCache = createAsyncCache<ConditionsPayload>(300);
+@@ -280,6 +281,11 @@ type Weather = {
+   basis: "OUTING_WINDOWS" | "DAY";
+   focusTimes: string[];
+   kind: "forecast" | "observation";
++  windBasis?: "daily-mean" | "daily-maximum" | "hourly-maximum";
++  windObservationHours?: number;
++  windSourceUrl?: string;
++  observationStation?: string;
++  observationSourceUrl?: string;
+ };
+ type RainDay = {
+   date: string;
+@@ -640,7 +646,7 @@ async function getRecentRain(key: string, location: Location, targetDate: string
+   };
+ }
+ 
+-async function getHistoricalWeather(key: string, location: Location, targetDate: string): Promise<Weather> {
++async function getHistoricalWeatherApi(key: string, location: Location, targetDate: string): Promise<Weather> {
+   const url = new URL("https://apis.data.go.kr/1360000/AsosDalyInfoService/getWthrDataList");
+   url.search = new URLSearchParams({
+     serviceKey: normalizeKey(key), pageNo: "1", numOfRows: "10", dataType: "JSON",
+@@ -649,6 +655,8 @@ async function getHistoricalWeather(key: string, location: Location, targetDate:
+   const res = await fetch(url, { headers: { "User-Agent": "HaerugilGuide/1.0" }, signal: AbortSignal.timeout(12000) });
+   if (!res.ok) throw new Error(`ASOS HTTP ${res.status}`);
+   const json = await res.json();
++  const responseError = publicDataError(json);
++  if (responseError) throw new Error(responseError);
+   const row = deepItems(json).find(item => String(item.tm ?? "") === targetDate);
+   if (!row) throw new Error("해당 날짜 관측자료 없음");
+   const number = (name: string, fallback = 0) => {
+@@ -671,9 +679,61 @@ async function getHistoricalWeather(key: string, location: Location, targetDate:
+     basis: "DAY",
+     focusTimes: [],
+     kind: "observation",
++    windBasis: "daily-maximum",
++    observationStation: `${asosStationName(location)} ASOS`,
++    observationSourceUrl: `https://www.weather.go.kr/w/weather/land/past-obs/obs-by-day.do?stn=${asosStation(location)}&yy=${targetDate.slice(0,4)}&mm=${Number(targetDate.slice(5,7))}&obs=1`,
+   };
+ }
+ 
++const historicalWeatherCache = createAsyncCache<Weather>(160);
++const historicalTableCache = createAsyncCache<string>(36);
++let historicalApiRetryAt = 0;
++async function historicalTable(url: URL) {
++  return (await historicalTableCache.get(url.toString(), async () => {
++    const response = await fetch(url, {headers:{"User-Agent":"HaerugilGuide/1.0",Accept:"text/html"}, signal:AbortSignal.timeout(9000)});
++    if (!response.ok) throw new Error(`기상청 관측표 HTTP ${response.status}`);
++    const html = await response.text();
++    if (!/table-cal|weather_table/.test(html)) throw new Error("기상청 관측표 응답 확인 필요");
++    return html;
++  }, () => 10 * 60_000)).value;
++}
++async function getHistoricalWeatherPage(location: Location, targetDate: string): Promise<Weather> {
++  const [year,month] = targetDate.split("-");
++  const dailyUrl = new URL("https://www.weather.go.kr/w/weather/land/past-obs/obs-by-day.do");
++  dailyUrl.search = new URLSearchParams({stn:asosStation(location),yy:year,mm:String(Number(month)),obs:"1"}).toString();
++  const element = (obs: string) => {
++    const url = new URL("https://www.weather.go.kr/w/weather/land/past-obs/obs-by-element.do");
++    url.search = new URLSearchParams({stn:asosStation(location),yy:year,obs}).toString(); return url;
++  };
++  const [dailyHtml,windHtml,humidityHtml] = await Promise.all([historicalTable(dailyUrl),historicalTable(element("06")),historicalTable(element("12"))]);
++  const daily = parseDailyObservations(dailyHtml,year,month).get(targetDate);
++  let wind = parseElementObservations(windHtml,year,"wind").get(targetDate);
++  const humidity = parseElementObservations(humidityHtml,year,"humidity").get(targetDate);
++  let windObservationHours: number | undefined;
++  let windSourceUrl: string | undefined;
++  if (daily && wind === undefined) {
++    const hourlyUrl = new URL("https://www.weather.go.kr/w/weather/land/city-obs.do");
++    hourlyUrl.search = new URLSearchParams({tm:`${targetDate.replaceAll("-", ".")}.23:00`,type:"t99",mode:"0",reg:"100",auto_man:"m",stn:asosStation(location)}).toString();
++    const hourly = parseHourlyWind(await historicalTable(hourlyUrl),targetDate,asosStation(location));
++    wind = hourly.wind; windObservationHours = hourly.hours; windSourceUrl = hourlyUrl.toString();
++  }
++  if (!daily || wind === undefined || humidity === undefined) throw new Error("해당 날짜 관측자료가 아직 완성되지 않았어요. 전일 자료는 발표 후 다시 확인합니다.");
++  return {temperature:daily.temperature,wind,rain:daily.rain,rainDayTotal:daily.rain,rainProbability:0,rainDayProbability:0,waveHeight:null,humidity,
++    sky:daily.cloud === null ? "관측 미제공" : daily.cloud <= 2 ? "맑음" : daily.cloud <= 5 ? "구름많음" : "흐림",basis:"DAY",focusTimes:[],kind:"observation",windBasis:windObservationHours ? "hourly-maximum" : "daily-mean",windObservationHours,windSourceUrl,
++    observationStation:`${asosStationName(location)} ASOS (기상청 공개 관측표)`,observationSourceUrl:dailyUrl.toString()};
++}
++async function getHistoricalWeather(key: string, location: Location, targetDate: string): Promise<Weather> {
++  return (await historicalWeatherCache.get(`${asosStation(location)}:${targetDate}`, async () => {
++    if (Date.now() >= historicalApiRetryAt) {
++      try { return await getHistoricalWeatherApi(key,location,targetDate); }
++      catch (error) {
++        if (error instanceof Error && /403|SERVICE_KEY|ACCESS_DENIED|SERVICE_ACCESS/.test(error.message)) historicalApiRetryAt = Date.now() + 30 * 60_000;
++      }
++    }
++    return getHistoricalWeatherPage(location,targetDate);
++  }, () => 6 * 60 * 60_000)).value;
++}
++
+ function locationCoordinates(location: Location) {
+   if (location.lat !== undefined && location.lon !== undefined) return { lat: location.lat, lon: location.lon };
+ 
+@@ -925,7 +985,7 @@ async function getBestTides(key: string, location: Location, date: string, allow
+ }
+ 
+ function scoreConditions(tides: Tide[], weather: Weather | null, recentRain: RecentRain | null, date: string, terrain: string) {
+-  if (!tides.length) return { score: 0, rating: "나쁨" as const, bestWindow: "", recommendedWindows: [], summary: "공식 물때 자료를 확인하지 못했어요", scoreBreakdown: { base: 0, tide: 0, weather: 0, visibility: null }, riskFlags: ["공식 물때 자료 대기"] };
++  if (!tides.length) return { score: 0, rating: getScoreRating(0), bestWindow: "", recommendedWindows: [], summary: "공식 물때 자료를 확인하지 못했어요", scoreBreakdown: { base: 0, tide: 0, weather: 0, visibility: null }, riskFlags: ["공식 물때 자료 대기"] };
+   const baseScore = 60;
+   const mulTtae = getMulTtae(date);
+   const tideScore = getTideAdjustment(mulTtae) ?? 0;
+@@ -951,7 +1011,7 @@ function scoreConditions(tides: Tide[], weather: Weather | null, recentRain: Rec
+   let score = baseScore + tideScore + weatherScore + (visibilityScore ?? 0);
+   score = Math.max(0, Math.min(100, Math.round(score)));
+   if (riskFlags.some(flag => ["강풍 위험", "강한 비", "높은 파고"].includes(flag))) score = Math.min(score, 34);
+-  const rating = score >= 85 ? "최상" : score >= 70 ? "좋음" : score >= 45 ? "중간" : "나쁨";
++  const rating = getScoreRating(score);
+   const format = (total: number) => `${String((Math.floor(total / 60) + 24) % 24).padStart(2, "0")}:${String((total % 60 + 60) % 60).padStart(2, "0")}`;
+   const lows = tides.filter(tide => tide.type === "low");
+   const recommendedWindows = lows.map((low) => {
+@@ -968,7 +1028,7 @@ function scoreConditions(tides: Tide[], weather: Weather | null, recentRain: Rec
+     };
+   });
+   const bestWindow = recommendedWindows.map(window => `${window.start} ~ ${window.end}`).join(" · ");
+-  const summary = !weather ? `물때 기준 ${rating} · 날씨는 아직 반영되지 않았어요` : rating === "최상" ? "선호 물때와 날씨 조건이 좋아요" : rating === "좋음" ? "해루질하기 무난한 조건이에요" : rating === "중간" ? "현장 바람과 물 흐름을 확인하세요" : "오늘은 해루질을 권하지 않아요";
++  const summary = !weather ? `물때 기준 ${rating} · 날씨는 아직 반영되지 않았어요` : rating === "당장 가야 함" ? "선호 물때와 날씨 조건이 좋아요" : rating === "좋음" ? "해루질하기 무난한 조건이에요" : rating === "보통" ? "현장 바람과 물 흐름을 확인하세요" : "오늘은 해루질을 권하지 않아요";
+   return { score, rating, bestWindow, recommendedWindows, summary, mulTtae, waterVisibility, scoreBreakdown: { base: baseScore, tide: tideScore, weather: weatherScore, visibility: visibilityScore }, riskFlags };
+ }
+ 
+@@ -1093,6 +1153,7 @@ async function loadConditions(locationId: string, location: Location, date: stri
+     ],
+   };
+   const payload = {
++    scoreNote: historical && weatherLive ? `과거 관측 참고 점수 · ${weather.windBasis === "hourly-maximum" ? `관측 ${weather.windObservationHours}/24시간 중 최대 풍속` : `${weather.windBasis === "daily-mean" ? "일평균" : "일최대"} 풍속`}·하루 강수 기준 · 파고·물색 미반영` : undefined,
+     live: tideLive && weatherLive,
+     sourceStatus: { tide: tideLive, weather: weatherLive, recentRain: recentRainLive, recentRainOfficial },
+     pendingSources: { ...pendingSources },
+diff --git a/app/catch-history.tsx b/app/catch-history.tsx
+new file mode 100644
+index 0000000..0ae33d2
+--- /dev/null
++++ b/app/catch-history.tsx
+@@ -0,0 +1,60 @@
++"use client";
++
++import { useState } from "react";
++import { CATCH_REPORTS, CATCH_CHECKED_ON, filterCatchReports, monthlyEvidence, regionalEvidence, catchReportsCsv } from "../lib/catch-evidence";
++
++const regions = [...new Set(CATCH_REPORTS.map(report => report.region))].sort((a,b) => a.localeCompare(b,"ko"));
++const speciesOptions = [...new Set(CATCH_REPORTS.flatMap(report => report.catches.map(item => item.species)))].sort((a,b) => a.localeCompare(b,"ko"));
++const years = [...new Set(CATCH_REPORTS.flatMap(report => report.caughtOn ? [report.caughtOn.slice(0,4)] : []))].sort().reverse();
++
++export function CatchHistory({ spotId, spotName }: { spotId: string; spotName: string }) {
++  const [region, setRegion] = useState("");
++  const [species, setSpecies] = useState("");
++  const [year, setYear] = useState("");
++  const [month, setMonth] = useState(0);
++  const [onlySpot, setOnlySpot] = useState(false);
++  const filter = {region, species, year, month, spotId: onlySpot ? spotId : undefined};
++  const reports = filterCatchReports(CATCH_REPORTS, filter);
++  const months = monthlyEvidence(CATCH_REPORTS, filter);
++  const comparisons = regionalEvidence(reports, species);
++  const dated = reports.filter(report => report.caughtOn);
++  const undated = reports.filter(report => !report.caughtOn);
++  const authorCount = new Set(reports.map(report => report.author)).size;
++  const clear = () => { setRegion(""); setSpecies(""); setYear(""); setMonth(0); setOnlySpot(false); };
++  function download() {
++    const url = URL.createObjectURL(new Blob([catchReportsCsv(reports)], {type:"text/csv;charset=utf-8"}));
++    const link = document.createElement("a"); link.href = url; link.download = "끼리끼리-조과기록.csv"; link.click();
++    setTimeout(() => URL.revokeObjectURL(url), 1000);
++  }
++  return <div className="content-stack catch-history">
++    <section className="section-card catch-controls">
++      <div className="section-title-row"><h2>지역별 조과 기록</h2><span>원문 확인 {CATCH_CHECKED_ON}</span></div>
++      <p className="catch-intro">어디서, 몇 월에, 무엇을 잡았는지 공개 후기로 확인하세요.</p>
++      <div className="catch-filters">
++        <label>지역<select value={region} onChange={event => {setRegion(event.target.value); setOnlySpot(false);}}><option value="">전체 지역</option>{regions.map(item => <option key={item}>{item}</option>)}</select></label>
++        <label>어종<select value={species} onChange={event => setSpecies(event.target.value)}><option value="">전체 어종</option>{speciesOptions.map(item => <option key={item}>{item}</option>)}</select></label>
++        <label>출조 연도<select value={year} onChange={event => setYear(event.target.value)}><option value="">전체 연도</option>{years.map(item => <option key={item} value={item}>{item}년</option>)}</select></label>
++      </div>
++      <div className="catch-actions"><button type="button" aria-pressed={onlySpot} onClick={() => {setOnlySpot(!onlySpot); setRegion("");}}>선택 장소: {spotName}</button><button type="button" onClick={clear}>전체 기록 보기</button></div>
++      <div className="catch-month-heading"><b>출조한 달</b><button type="button" aria-pressed={month === 0} onClick={() => setMonth(0)}>전체 시기</button></div>
++      <div className="catch-months" aria-label="출조 월 선택">{months.map(item => <button type="button" key={item.month} aria-pressed={month === item.month} onClick={() => setMonth(month === item.month ? 0 : item.month)}><b>{item.month}월</b><span>{item.reports ? `${item.reports}건` : "미수집"}</span></button>)}</div>
++      <p className="catch-help">숫자는 잡은 마릿수가 아닌 원문 기록 수입니다. 출조한 달이 불명확한 글은 월별 집계에서 제외합니다.</p>
++    </section>
++
++    <section className="section-card catch-results" aria-live="polite">
++      <div className="section-title-row"><h2>{month ? `${month}월` : "전체 시기"} 확인 결과</h2><button type="button" className="catch-download" onClick={download} disabled={!reports.length}>표 내려받기</button></div>
++      <div className="catch-stats"><div><strong>{reports.length}</strong><span>원문 기록</span></div><div><strong>{authorCount}</strong><span>작성자</span></div><div><strong>{dated.length}</strong><span>출조 월 확인</span></div></div>
++      <p className="catch-evidence-note">개인이 올린 과거 조과입니다. 출조 인원·시간과 빈손 기록이 충분하지 않아 성공률이나 ‘잘 잡히는 달’을 확정할 수 없습니다.</p>
++      {!reports.length && <div className="catch-empty"><b>이 조건의 확인된 기록이 아직 없습니다.</b><p>기록 없음은 안 잡힌다는 뜻이 아닙니다. 다른 달이나 전체 지역도 확인해 보세요.</p><button type="button" onClick={clear}>전체 기록 보기</button></div>}
++      {comparisons.length > 0 && <div className="catch-summary-list" aria-label="지역과 월별 어종 요약">{comparisons.map(row => <article key={`${row.region}/${row.place}/${row.month}/${row.species}`}><div><b>{row.month}월 · {row.place}</b><span>{row.region} · {[...row.years].sort().join("·")}년</span></div><strong>{row.species}</strong><p>{[row.caught.size ? `잡음 ${row.caught.size}건` : "", row.poor.size ? `적은 조과 ${row.poor.size}건` : "", row.none.size ? `못 잡음 ${row.none.size}건` : "", row.observed.size ? `관찰·방생 ${row.observed.size}건` : ""].filter(Boolean).join(" · ")}</p><small>작성자 {row.authors.size}명 · 계절 판단 자료 부족</small></article>)}</div>}
++      {undated.length > 0 && <p className="catch-help">출조 월 미확인 {undated.length}건은 아래 원문 목록에서만 볼 수 있습니다.</p>}
++    </section>
++
++    {reports.length > 0 && <section className="section-card catch-source-list"><h2>근거 원문 {reports.length}건</h2>{reports.map(report => <details key={report.id} className="catch-source">
++      <summary><span><b>{report.place}</b><span>{report.caughtLabel}</span><small>{report.catches.filter(item => !species || item.species === species).map(item => `${item.species} ${item.result}`).join(" · ")}</small></span><span className={`catch-date-badge ${report.caughtOn ? "" : "undated"}`}>{report.caughtOn ? "출조 월 확인" : "시기 미확인"}</span></summary>
++      <div className="catch-source-body"><p>{report.summary}</p><dl><div><dt>지역·방식</dt><dd>{report.region} · {report.method}</dd></div><div><dt>수량</dt><dd>{report.catches.filter(item => !species || item.species === species).map(item => <span key={item.species}>{item.species}: {item.quantity} ({item.result})</span>)}</dd></div><div><dt>날짜 근거</dt><dd>{report.dateEvidence}</dd></div>{report.conditions && <div><dt>현장 조건</dt><dd>{report.conditions}</dd></div>}<div><dt>해석 범위</dt><dd>{report.limitation}</dd></div></dl><p className="catch-byline">{report.platform} · {report.author}<br/>{report.postedLabel ?? "게시일"} {report.postedOn}</p><a href={report.url} target="_blank" rel="noopener noreferrer">{report.title} · 원문 보기 ↗</a></div>
++    </details>)}</section>}
++
++    <section className="section-card catch-method"><details><summary>어떤 자료를 집계하나요?</summary><ul><li>공개 원문에서 장소·조과·출조 시기를 확인합니다. 게시일을 출조일로 바꾸지 않습니다.</li><li>같은 글과 동행인의 조과는 중복 집계하지 않습니다. 유료 체험, 낚시·통발, 관찰·방생을 구분합니다.</li><li>마릿수는 글에 적힌 수만 옮깁니다. 사진만 보고 수량이나 정확한 종을 추정하지 않습니다.</li><li>일반 제철 설명과 광고성 포인트 안내는 실제 조과 건수에 넣지 않습니다. 현재 자료는 종합점수 가산에 사용하지 않습니다.</li><li>당근·카페 기록은 원문과 공개 공유 범위를 확인한 뒤 추가합니다. 현재는 직접 확인 가능한 공개 블로그 기록을 수록했습니다.</li></ul><p>후기 속 과거 장소·행동은 현재 출입·채취 허용을 뜻하지 않습니다.</p><p className="catch-help">카페 기록에 함께 남길 항목: 출조 날짜 / 지역·장소 / 어종 / 수량·단위(0 포함) / 인원·시간 / 채집 방식 / 물색·물때 / 원문 링크 / 공개 공유 가능 여부</p></details></section>
++  </div>;
++}
+diff --git a/app/globals.css b/app/globals.css
+index 918d259..38a4442 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -435,3 +435,38 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,su
+ .hero-score-value strong small { margin-left: 2px; font-size: 13px; }
+ .hero-score-value > span { font-size: 13px; font-weight: 800; white-space: nowrap; }
+ @media (max-width: 360px) { .hero-overall-score { gap: 8px; padding: 10px; }.hero-score-value { gap: 5px; }.hero-score-label b { font-size: 13px; }.hero-score-value strong { font-size: 26px; } }
++
++/* Evidence archive: compact month calendar and source-led records. */
++.tabs { grid-template-columns: repeat(5,minmax(0,1fr)); }
++.catch-history { min-width: 0; }
++.catch-history h2 { font-size: 20px; }
++.catch-history p { font-size: 15px; line-height: 1.65; }
++.catch-intro { margin: 10px 0 18px; color: #425d60; }
++.catch-filters { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
++.catch-filters label { display: grid; gap: 6px; font-size: 14px; font-weight: 700; min-width: 0; }
++.catch-filters select { width: 100%; min-width: 0; min-height: 44px; padding: 8px; color: #163e43; background: white; border: 1px solid #b5d0cf; border-radius: 8px; font-size: 15px; }
++.catch-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 20px; }
++.catch-history button { min-height: 44px; padding: 8px 12px; border: 1px solid #b5d0cf; border-radius: 9px; background: #f2fafa; color: #15595e; cursor: pointer; font-size: 14px; }
++.catch-history button[aria-pressed="true"] { background: #056c77; border-color: #056c77; color: white; }
++.catch-history button:disabled { opacity: .5; cursor: default; }
++.catch-month-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
++.catch-months { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 7px; }
++.catch-months button { display: grid; gap: 4px; min-height: 62px; padding: 8px 3px; }
++.catch-months span { font-size: 12px; }
++.catch-history .catch-help { font-size: 13px; color: #526c70; }
++.catch-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin: 16px 0; padding: 14px 0; border-block: 1px solid #dce8e7; }
++.catch-stats > div { display: grid; gap: 4px; text-align: center; }
++.catch-stats strong { font-size: 29px; color: #056c77; }.catch-stats span { font-size: 14px; color: #435e63; }
++.catch-history .catch-evidence-note { padding: 12px; border-left: 3px solid #d7a629; background: #fff9e9; color: #594819; font-size: 14px; }
++.catch-summary-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
++.catch-summary-list article { padding: 13px; border: 1px solid #cfdfdf; border-radius: 10px; min-width: 0; }
++.catch-summary-list article > div { display: grid; gap: 3px; margin-bottom: 8px; }.catch-summary-list b { font-size: 15px; }.catch-summary-list span,.catch-summary-list small { font-size: 12px; color: #536c70; }.catch-summary-list strong { font-size: 17px; color: #0b626b; }.catch-summary-list p { margin: 5px 0; font-size: 14px; }
++.catch-source { border-top: 1px solid #d5e3e2; }.catch-source:first-of-type { margin-top: 12px; }.catch-source summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 15px 0; cursor: pointer; }.catch-source summary > span:first-child { display: grid; gap: 5px; min-width: 0; }.catch-source summary b { font-size: 17px; }.catch-source summary span span { font-size: 14px; color: #46656a; }.catch-source summary small { font-size: 13px; color: #46656a; }.catch-date-badge { flex-shrink: 0; padding: 6px; background: #e2f3ef; color: #116750; border-radius: 6px; font-size: 12px; }.catch-date-badge.undated { background: #f5ebdc; color: #805016; }.catch-date-badge::after { content: ' ＋'; }.catch-source[open] .catch-date-badge::after { content: ' −'; }
++.catch-source-body { padding: 0 0 17px; overflow-wrap: anywhere; }.catch-source-body p { margin: 8px 0; }.catch-source-body dl { display: grid; gap: 12px; font-size: 14px; line-height: 1.6; }.catch-source-body dl > div { display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 6px; }.catch-source-body dt { font-weight: 700; color: #2b535a; }.catch-source-body dd { margin: 0; }.catch-source-body dd span { display: block; }.catch-source-body a { display: inline-block; padding-block: 10px; font-size: 15px; font-weight: 700; color: #005f70; text-decoration: underline; }.catch-source-body .catch-byline { font-size: 13px; color: #526c70; }
++.catch-method summary { font-size: 16px; font-weight: 700; cursor: pointer; padding-block: 8px; }.catch-method ul { padding-left: 20px; font-size: 14px; line-height: 1.7; }.catch-method li { margin-bottom: 8px; }.catch-empty { padding: 20px 0; text-align: center; }.catch-empty b { font-size: 16px; }
++.hero-overall-score { flex-wrap: wrap; }.hero-score-value { flex-wrap: wrap; }.hero-score-value > span { white-space: normal; }.score-card > div { flex-wrap: wrap; }.score-card > div > b { min-width: fit-content; }
++@media (max-width: 470px) { .catch-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }.catch-filters label:last-child { grid-column: 1 / -1; }.catch-summary-list { grid-template-columns: 1fr; }.catch-history .section-title-row { flex-wrap: wrap; gap: 9px; }.catch-months { gap: 5px; }.catch-stats span { font-size: 13px; }.tabs button { font-size: 12px; } }
++.catch-inline-link { border: 0; padding: 6px; background: transparent; color: #006777; text-decoration: underline; font: inherit; cursor: pointer; }
++.local-species-card > .catch-help { font-size: 14px; line-height: 1.6; color: #526c70; }
++.score-history-note { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: #e1f7f5; }
++.observation-source { display: inline-block; padding: 10px 0; color: #005f70; font-size: 14px; text-decoration: underline; }
+diff --git a/app/page.tsx b/app/page.tsx
+index 010d71b..6924bbc 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -7,14 +7,16 @@ import { createComparisonCache, mapConcurrent } from "../lib/conditions-client";
+ import { getMulTtae } from "../lib/tide-calendar";
+ import { SPOTS } from "../lib/spots";
+ import { getWaterVisibility } from "../lib/water-visibility";
+-import { getTideAdjustment, getVisibilityAdjustment, signedPoints, SCORE_POLICY_DESCRIPTION } from "../lib/score-policy";
++import { getTideAdjustment, getVisibilityAdjustment, signedPoints, SCORE_POLICY_DESCRIPTION, getScoreRating, type ScoreRating } from "../lib/score-policy";
+ import { explainRain, explainWave, explainWind } from "../lib/weather-feel";
+ import { tidePointFor } from "../lib/tide-points";
+ import { PwaInstallButton } from "./pwa-install-button";
+ import { SpeciesIcon } from "./species-icon";
++import { CatchHistory } from "./catch-history";
+ 
+ type Tide = { time: string; height: number; type: "high" | "low" };
+ type Conditions = {
++  scoreNote?: string;
+   weatherPreview?: boolean;
+   tidePreview?: boolean;
+   tideRetrievedAt?: string;
+@@ -29,12 +31,12 @@ type Conditions = {
+   correctionQuality?: "local" | "nearby" | "coordinate" | "direct" | "unsupported";
+   confidence?: { level: "높음" | "보통" | "낮음"; officialSources: number; tideBasis: string; reasons: string[] };
+   date: string;
+-  rating: "최상" | "좋음" | "중간" | "나쁨";
++  rating: ScoreRating;
+   score: number;
+   summary: string;
+   bestWindow: string;
+   recommendedWindows: Array<{ lowTime: string; lowHeight: number; start: string; end: string; startDayOffset?: number; endDayOffset?: number; period: "낮" | "밤" }>;
+-  weather: { forecastTimes?: string[]; representativeTime?: string; issuedAt?: string | null; rainUsesCategoryBounds?: boolean; missingWindowTimes?: string[]; coverageNote?: string; temperature: number; wind: number; rain: number; rainDayTotal?: number | null; sky: string; waveHeight: number | null; rainProbability: number; rainDayProbability?: number; humidity: number; basis?: "OUTING_WINDOWS" | "DAY"; focusTimes?: string[]; kind?: "forecast" | "observation" };
++  weather: { windBasis?: "daily-mean" | "daily-maximum" | "hourly-maximum"; windObservationHours?: number; windSourceUrl?: string; observationStation?: string; observationSourceUrl?: string; forecastTimes?: string[]; representativeTime?: string; issuedAt?: string | null; rainUsesCategoryBounds?: boolean; missingWindowTimes?: string[]; coverageNote?: string; temperature: number; wind: number; rain: number; rainDayTotal?: number | null; sky: string; waveHeight: number | null; rainProbability: number; rainDayProbability?: number; humidity: number; basis?: "OUTING_WINDOWS" | "DAY"; focusTimes?: string[]; kind?: "forecast" | "observation" };
+   recentRain?: {
+     last24h: number | null;
+     last48h: number | null;
+@@ -108,10 +110,10 @@ const CAMPS = [
+ ];
+ 
+ const ratingClass: Record<Conditions["rating"], string> = {
+-  최상: "best",
++  "당장 가야 함": "best",
+   좋음: "good",
+-  중간: "middle",
+-  나쁨: "bad",
++  보통: "middle",
++  비추: "bad",
+ };
+ 
+ const RECOMMEND_CANDIDATES = [
+@@ -207,41 +209,6 @@ const SPECIES_RANK_CANDIDATES: Record<RankSpecies, string[]> = {
+   백합: ["mongsanpo", "cheongpodae", "gomsom", "mageompo", "muchangpo", "doksan", "chunjangdae", "seondori", "dangampo", "jinsanri", "biin", "byeonsan", "baekmiri", "mokpo"],
+ };
+ 
+-const FIELD_REPORT_BONUS: Partial<Record<RankSpecies, Record<string, number>>> = {
+-  낙지: { hwangdo: 7, ganwoldo: 6, waemok: 5, gomsom: 5, garorim: 5 },
+-  소라: { padory: 7, hakampo: 6, guryepo: 6, gareumi: 5, somuui: 5 },
+-  광어: { waemok: 10 },
+-  우럭: { sinjindo: 7, anheung: 7, padory: 5, somuui: 5 },
+-  꽃게: { mongsanpo: 7, ganwoldo: 5, muchangpo: 5 },
+-  대하: { mongsanpo: 6, ganwoldo: 6, garorim: 5, muchangpo: 5 },
+-  새우: {},
+-  골뱅이: { padory: 6, hakampo: 5, guryepo: 5, somuui: 4 },
+-  농어: { mongsanpo: 9, waemok: 5, anheung: 5, sinjindo: 5 },
+-  숭어: { mongsanpo: 9, ganwoldo: 5, garorim: 5 },
+-  해삼: { padory: 6, hakampo: 5, gareumi: 5, somuui: 4 },
+-  맛조개: {},
+-  동죽: {},
+-  바지락: { ganwoldo: 7, jungri: 6, seondori: 5, baekmiri: 5 },
+-  백합: { mongsanpo: 6, cheongpodae: 5, seondori: 5, mokpo: 5 },
+-};
+-
+-const AQUACULTURE_ECOLOGY_BONUS: Partial<Record<RankSpecies, Record<string, number>>> = {
+-  광어: { waemok: 10, sinjindo: 5, anheung: 5 },
+-  우럭: { waemok: 10, sinjindo: 6, anheung: 6 },
+-};
+-
+-const SPECIES_EVIDENCE: Partial<Record<RankSpecies, Record<string, string>>> = {
+-  광어: { waemok: "근거 A · 키릭의 왜목마을 광어 다수 직접관찰" },
+-  맛조개: {
+-    mongsanpo: "근거 C · 넓은 모래갯벌 지형 후보, 확인 가능한 조과글 추가 필요", doksan: "근거 C · 넓은 모래갯벌 지형 후보, 현장 채취허용 확인 필요",
+-    chunjangdae: "근거 C · 모래갯벌 지형 후보, 확인 가능한 조과글 추가 필요", muchangpo: "근거 C · 모래갯벌 지형 후보, 실제 조과 미확인",
+-  },
+-  동죽: {
+-    seonjaedo_eochon: "근거 B · 어촌체험마을 권역, 동죽 운영 여부는 방문 전 확인", jeburi_eochon: "근거 B · 어촌체험마을 권역, 동죽 운영 여부는 방문 전 확인",
+-    baekmiri: "근거 B · 어촌체험마을 권역, 채취종목·운영일 확인", jungri: "근거 B · 어촌체험마을 권역, 채취종목·운영일 확인", seondori: "근거 B · 갯벌체험장 권역, 동죽 채취 가능 여부 확인",
+-  },
+-};
+-
+ function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+   const rad = (v: number) => v * Math.PI / 180;
+   const dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
+@@ -299,12 +266,8 @@ function speciesRankScore(species: RankSpecies, spot: typeof SPOTS[number], data
+ 
+   const visibility = getWaterVisibility(data, spot.terrain);
+   const visibilityPoints = getVisibilityAdjustment(visibility.level) ?? 0;
+-  const fieldBonus = FIELD_REPORT_BONUS[species]?.[spot.id] ?? 0;
+-  const aquacultureBonus = AQUACULTURE_ECOLOGY_BONUS[species]?.[spot.id] ?? 0;
+-  const evidence = SPECIES_EVIDENCE[species]?.[spot.id]
+-    ?? (aquacultureBonus ? "근거 B · 양식활동 연안권 보조정보, 실제 조과는 추가 확인 필요" : "근거 C · 지형·물때 후보, 검증 가능한 현장 조과 제보 없음");
+-  const evidencePoints = evidence.startsWith("근거 A") ? 5 : evidence.startsWith("근거 B") ? 2 : 0;
+-  const reportPoints = Math.max(evidencePoints, clamp((fieldBonus + aquacultureBonus) * .5, 0, 5));
++  const reportPoints = 0;
++  const evidence = "조과 기록 탭에서 원문 확인 · 표본 부족으로 조과 가산 없음";
+ 
+   const score = Math.round(clamp(habitatPoints + tidePoints + timingPoints + seasonPoints + visibilityPoints + reportPoints, 0, 98.9) * 10) / 10;
+   const reasons = [
+@@ -314,13 +277,11 @@ function speciesRankScore(species: RankSpecies, spot: typeof SPOTS[number], data
+     `${timeGuide.icon} ${timeGuide.label}·${matchingLow ? "맞는 시간대 간조 있음" : "맞는 시간대 간조 없음"}·수중시야 ${visibility.level} → 시간 ${timingPoints}/15, 물색 ${signedPoints(visibilityPoints)}`,
+     `${month}월 계절점수 ${seasonPoints}/15점: ${season.text}`,
+   ];
+-  if (fieldBonus) reasons.push(`공개 현장 경험 가산 ${Math.min(5, fieldBonus * .5).toFixed(1)}점`);
+-  if (aquacultureBonus) reasons.push(`양식활동 연안권 보조 가산 포함(출입·채취 허용 의미 아님)`);
+   return { score, reasons };
+ }
+ 
+ function top5Rating(score: number): Conditions["rating"] {
+-  return score >= 85 ? "최상" : score >= 72 ? "좋음" : score >= 55 ? "중간" : "나쁨";
++  return getScoreRating(score);
+ }
+ 
+ function isoDate(d: Date) {
+@@ -436,8 +397,8 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
+       else if (profile.good.includes(month)) { score += 4; reasons.push(`${month}월은 ${item.name} 활동을 기대할 수 있어요. ${profile.text}`); }
+       else { score -= 7; reasons.push(`${month}월은 ${item.name}의 중심 시기에서 벗어나 계절 감점을 적용했어요.`); }
+     }
+-    if (location === "waemok" && (item.name === "광어" || item.name === "우럭")) { score += 10; reasons.push("왜목마을에서 실제 광어·우럭을 다수 관찰한 사용자 현장기록을 반영했어요."); }
+-    if (location === "mongsanpo" && ["꽃게", "농어", "숭어"].includes(item.name)) { score += 9; reasons.push("몽산포에서 꽃게와 농어·숭어류를 관찰한 사용자 현장기록을 반영했어요."); }
++    if (location === "waemok" && (item.name === "광어" || item.name === "우럭")) reasons.push("운영자 관찰 메모가 있으나 일자·원문 미등록으로 조과 가산은 보류했어요.");
++    if (location === "mongsanpo" && ["꽃게", "농어", "숭어"].includes(item.name)) reasons.push("운영자 관찰 메모가 있으나 일자·원문 미등록으로 조과 가산은 보류했어요.");
+     if (tideRange !== null) {
+       if (tideAdjustment !== null && tideAdjustment > 0 && tideRange >= 350) { score += 8; reasons.push(`오늘 조차가 약 ${Math.round(tideRange)}cm로 커서 간조 노출 면적을 기대할 수 있어요.`); }
+       else if (tideRange < 180) { score -= 7; reasons.push(`오늘 조차가 약 ${Math.round(tideRange)}cm로 작아 노출 면적이 제한될 수 있어요.`); }
+@@ -458,7 +419,7 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
+       if (!data.sourceStatus.weather) reasons.push("이 날짜는 단기 날씨 발표 범위 밖이라 물때·지형 중심으로 계산했어요.");
+     }
+     score = Math.max(10, Math.min(95, Math.round(score)));
+-    const grade = score >= 80 ? "기대 높음" : score >= 65 ? "좋음" : score >= 45 ? "보통" : "기대 낮음";
++    const grade = getScoreRating(score);
+     return { ...item, timeGuide, score, grade, reasons: reasons.slice(0, 4) };
+   });
+   const rankedRows = [...scoredRows].sort((a, b) => Number(a.closed) - Number(b.closed) || b.score - a.score || a.name.localeCompare(b.name, "ko"));
+@@ -649,7 +610,7 @@ function getMetricExplanation(metric: DetailMetric, data: Conditions | null, ter
+ }
+ 
+ function activityRating(score: number): Conditions["rating"] {
+-  return score >= 85 ? "최상" : score >= 70 ? "좋음" : score >= 45 ? "중간" : "나쁨";
++  return getScoreRating(score);
+ }
+ 
+ function getActivityRatings(data: Conditions | null) {
+@@ -714,7 +675,7 @@ export default function Home() {
+   const [speciesRankings, setSpeciesRankings] = useState<Array<{ id: string; data: Conditions; score: number; reasons: string[] }>>([]);
+   const [speciesRankStatus, setSpeciesRankStatus] = useState<"idle" | "loading" | "error">("idle");
+   const [showAllSpecies, setShowAllSpecies] = useState(false);
+-  const [tab, setTab] = useState<"overview" | "species" | "camping" | "map">("overview");
++  const [tab, setTab] = useState<"overview" | "species" | "history" | "camping" | "map">("overview");
+   const [showDataGuide, setShowDataGuide] = useState(false);
+   const [shareNotice, setShareNotice] = useState("");
+   const [detailMetric, setDetailMetric] = useState<DetailMetric | null>(null);
+@@ -731,7 +692,8 @@ export default function Home() {
+   const dataGuideSheetRef = useRef<HTMLElement>(null);
+   const dataGuideWasOpen = useRef(false);
+   const spot = SPOTS.find((item) => item.id === spotId) ?? SPOTS[0];
+-  const { data, loading, savedTide, error: conditionsError } = useConditions<Conditions>(spot.source, date);
++  const { data, loading, savedTide, scoreHistory, error: conditionsError } = useConditions<Conditions>(spot.source, date);
++  const previousScore = scoreHistory.observation ?? scoreHistory.forecast;
+   const hasOverallScore = !loading && Boolean(data?.sourceStatus.tide && data.sourceStatus.weather) && Number.isFinite(data?.score);
+   const startupTide = data?.sourceStatus.tide ? data : savedTide;
+   const showingSavedTide = Boolean(startupTide && !data?.sourceStatus.tide);
+@@ -961,8 +923,11 @@ export default function Home() {
+           </div>
+           <div className="hero-overall-score" aria-label="해루질 종합점수" aria-live="polite">
+             <div className="hero-score-label"><b>해루질 종합점수</b><small>100점 만점 · 참고용 · 안전 보장 아님</small></div>
+-            <div className="hero-score-value">{hasOverallScore && data ? <><strong>{data.score}<small>점</small></strong><span>{data.rating}</span></> : <span>{loading ? "확인 중" : "자료 부족"}</span>}</div>
++            <div className="hero-score-value">{hasOverallScore && data ? <><strong>{data.score}<small>점</small></strong><span>{data.rating}</span></> : previousScore ? <><strong>{previousScore.score}<small>점</small></strong><span>{previousScore.rating}</span></> : <span>{loading ? "확인 중" : "계산 자료 대기"}</span>}</div>
+           </div>
++          {(data?.scoreNote && hasOverallScore) && <p className="score-history-note">{data.scoreNote}</p>}
++          {previousScore && !hasOverallScore && <p className="score-history-note">이전에 확인한 {previousScore.kind === "observation" ? "관측 참고" : "예보"} 점수 · {new Date(previousScore.checkedAt).toLocaleString("ko-KR", {timeZone:"Asia/Seoul"})} 기록 · {loading ? "새 자료 확인 중" : "새 조회 실패로 이전 기록 표시"}</p>}
++          {date < today && scoreHistory.forecast && hasOverallScore && data?.weather.kind === "observation" && <p className="score-history-note">당시 확인한 예보: {scoreHistory.forecast.score}점 · {scoreHistory.forecast.rating} / 위 점수는 실제 관측으로 다시 계산한 값입니다.</p>}
+           <p className="startup-tide-status">{showingSavedTide ? (loading ? "저장된 물때 · 최신 자료 확인 중" : "저장된 물때 · 최신 확인 실패") : data?.tidePreview ? "인근 기준항 먼저 표시 · 선택지점 자료 확인 중" : startupTide ? "확인된 조석예보" : "처음 조회한 자료는 다음 실행부터 바로 표시합니다."}{startupTide?.tideRetrievedAt && <> · 조회 {new Date(startupTide.tideRetrievedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}</>}</p>
+           <div className="source-line"><span>⚓ 기준 {displayedTideBasis}</span><span>{startupTide?.tideMethod === "nearby" ? "인근 기준점 참고 · 현지와 차이 있음" : "예측값 · 실시간 현장 수위 아님"}</span></div>
+ 
+@@ -1024,6 +989,7 @@ export default function Home() {
+       <nav className="tabs" aria-label="정보 구분" role="tablist">
+         <button role="tab" aria-selected={tab === "overview"} className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>출조</button>
+         <button role="tab" aria-selected={tab === "species"} className={tab === "species" ? "active" : ""} onClick={() => setTab("species")}>대상어종</button>
++        <button role="tab" aria-selected={tab === "history"} className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>조과 기록</button>
+         <button role="tab" aria-selected={tab === "camping"} className={tab === "camping" ? "active" : ""} onClick={() => setTab("camping")}>캠핑</button>
+         <button role="tab" aria-selected={tab === "map"} className={tab === "map" ? "active" : ""} onClick={() => setTab("map")}>지도·편의</button>
+       </nav>
+@@ -1032,9 +998,10 @@ export default function Home() {
+         <div className="content-stack overview-flow">
+           <section className="section-card forecast-card overview-step">
+             <div className="overview-step-head"><span>1</span><div><small>먼저 확인</small><h2>선택 날짜 자세히</h2></div><b>{formatDay(date)}</b></div>
++            {data?.weather.kind === "observation" && data.weather.observationSourceUrl && <a className="observation-source" href={data.weather.observationSourceUrl} target="_blank" rel="noopener noreferrer">기상청 과거 관측 원문 보기 ↗</a>}
+             {data?.tidePreview && <p className="accuracy-note">인근 기준항 물때 먼저 표시 · 선택지점 좌표형 자료 확인 중입니다. 확인 결과에 따라 물때와 날씨 시간대가 갱신될 수 있어요.</p>}
+             {data?.tideRetrievedAt && <p className="accuracy-note">물때 원자료 조회 {new Date(data.tideRetrievedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} (한국시간)</p>}
+-            {data?.sourceStatus.weather ? <div className={`weather-mode-label ${data.weather.kind === "observation" ? "observed" : "forecast"}`}><b>{data.weather.kind === "observation" ? "과거 실제 관측으로 재계산" : data.weatherPreview ? "선택 날짜 예보 · 물때 확인 중" : data.weather.basis === "DAY" ? "선택 날짜 제공 예보" : "확인된 시간대 예보"}</b><span>{data.weather.kind === "observation" ? "당시 예보 아님 · 실제 관측 재계산" : `예보 시각 ${(data.weather.forecastTimes ?? []).join(" · ") || "범위 확인 필요"} (한국시간)`}</span></div> : <div className="weather-unavailable-card"><span>☁️</span><div><b>{loading ? "공식 날씨 조회 중" : "공식 날씨 미확인"}</b><p>{conditionsError || data?.sourceErrors?.weather || "선택 날짜·시간의 날씨가 미제공되었거나 조회 중입니다."}</p></div></div>}
++            {data?.sourceStatus.weather ? <div className={`weather-mode-label ${data.weather.kind === "observation" ? "observed" : "forecast"}`}><b>{data.weather.kind === "observation" ? "과거 관측 참고 점수" : data.weatherPreview ? "선택 날짜 예보 · 물때 확인 중" : data.weather.basis === "DAY" ? "선택 날짜 제공 예보" : "확인된 시간대 예보"}</b><span>{data.weather.kind === "observation" ? `${data.weather.observationStation ?? "기상청 관측"} · ${data.weather.windBasis === "hourly-maximum" ? `관측 ${data.weather.windObservationHours}/24시간 중 최대 풍속` : data.weather.windBasis === "daily-mean" ? "하루 평균 풍속" : "하루 최대 풍속"}` : `예보 시각 ${(data.weather.forecastTimes ?? []).join(" · ") || "범위 확인 필요"} (한국시간)`}</span></div> : <div className="weather-unavailable-card"><span>☁️</span><div><b>{loading ? "공식 날씨 조회 중" : "공식 날씨 미확인"}</b><p>{conditionsError || data?.sourceErrors?.weather || "선택 날짜·시간의 날씨가 미제공되었거나 조회 중입니다."}</p></div></div>}
+             {data && <div className="accuracy-note" role="note">
+               <b>물때 기준: {data.tideSource?.stationName ?? data.referencePort}</b>
+               <p>{data.tideMethod === "nearby" ? "선택 해변의 현지 물높이가 아닌 인근 기준점 예보입니다. 간조 시각·높이는 현장과 다를 수 있어요." : data.tideSource?.correctionMethod}</p>
+@@ -1047,7 +1014,7 @@ export default function Home() {
+             <div className="selected-day-detail" aria-live="polite">
+               <div className="selected-day-title">
+                 <span>참고지수 · 안전 보장 아님</span>
+-                <strong>{(!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? data.rating : "자료 부족")} {!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? `${data.score}점` : ""}</strong>
++                <strong>{(!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? data.rating : "계산 자료 대기")} {!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? `${data.score}점` : ""}</strong>
+               </div>
+               <p>{loading ? "도착한 자료부터 표시합니다. 참고지수는 전체 자료 확인 후 표시해요." : conditionsError || data?.summary || "상세 자료를 불러오는 중이에요."}</p>
+               <p className="metric-tap-hint">👇 궁금한 숫자를 누르면 실제 체감과 물 상태를 설명해요.</p>
+@@ -1111,10 +1078,13 @@ export default function Home() {
+         </section>
+       </>}
+ 
++      {tab === "history" && <CatchHistory spotId={spot.id} spotName={spot.name} />}
++
+       {tab === "species" && (
+         <div className="content-stack">
+           <section className="section-card local-species-card">
+             <div className="section-title-row"><h2>{spot.name} 추천 생물 순위</h2><span>{formatDay(date)} · 점수순</span></div>
++            <p className="catch-help">지형·계절 가정으로 계산한 참고 순위입니다. 실제로 잡은 기록은 <button className="catch-inline-link" type="button" onClick={() => setTab("history")}>조과 기록</button>에서 출처와 함께 확인하세요.</p>
+             <div className="species-time-legend" aria-label="대상어종 추천 시간 범례">
+               <span className="time-badge time-day">☀️ 낮 채취</span>
+               <span className="time-badge time-night">🌙 야간 활동</span>
+@@ -1124,7 +1094,7 @@ export default function Home() {
+             <div className="species-list">
+               {species.rows.slice(0, showAllSpecies ? species.rows.length : 5).map((item, index) => {
+                 const timeClass = item.timeGuide.preference === "day" ? "time-day" : item.timeGuide.preference === "night" ? "time-night" : "time-either";
+-                const scoreClass = item.closed ? "closed-score" : item.score >= 80 ? "high" : item.score >= 65 ? "good" : item.score >= 45 ? "mid" : "low";
++                const scoreClass = item.closed ? "closed-score" : item.score >= 85 ? "high" : item.score >= 70 ? "good" : item.score >= 50 ? "mid" : "low";
+                 return <details key={item.name} className={`species-item ${item.closed ? "closed" : "open"}`}>
+                   <summary>
+                     <span className="species-leading"><b className={item.closed ? "closed-position" : ""}>{item.closed ? "제외" : `${index + 1}위`}</b><span className="species-icon"><SpeciesIcon name={item.name} /></span></span>
+@@ -1148,7 +1118,7 @@ export default function Home() {
+             <p className="species-rank-intro">노릴 생물을 고른 다음, 그 생물의 조건이 좋은 장소를 비교해 보세요.</p>
+             <label className="rank-species-select"><span>대상어종 선택</span><span className="rank-species-input"><span className="rank-selected-icon"><SpeciesIcon name={rankSpecies} /></span><select value={rankSpecies} onChange={(event) => chooseRankSpecies(event.target.value as RankSpecies)}>{RANK_SPECIES.map(item => <option key={item} value={item}>{item}</option>)}</select></span></label>
+             <p className={`rank-time-guide ${getSpeciesTimeGuide(rankSpecies).preference === "day" ? "time-day" : getSpeciesTimeGuide(rankSpecies).preference === "night" ? "time-night" : "time-either"}`}><b>{getSpeciesTimeGuide(rankSpecies).icon} {getSpeciesTimeGuide(rankSpecies).label}</b>{getSpeciesTimeGuide(rankSpecies).note}</p>
+-            <p className="season-guide"><b>{rankSpecies} 계절 정보</b>{SPECIES_SEASON[rankSpecies].text}</p>
++            <p className="season-guide"><b>{rankSpecies} 계절 가정 · 조과 통계 아님</b>{SPECIES_SEASON[rankSpecies].text}</p>
+             <button className="rank-load-button" onClick={() => loadSpeciesRankings(rankSpecies, date)} disabled={speciesRankStatus === "loading"}>{speciesRankStatus === "loading" ? `${rankSpecies} 순위 계산 중…` : `${rankSpecies} 좋은 지역 TOP 5 보기`}</button>
+             {speciesRankStatus === "error" && <p className="rank-error">자료를 일부 불러오지 못했어요. 잠시 후 다시 눌러 주세요.</p>}
+             {speciesRankings.length > 0 && <div className="species-rank-list">
+@@ -1162,7 +1132,7 @@ export default function Home() {
+                 </button>;
+               })}
+             </div>}
+-            <p className="rank-method"><b>근거등급</b> A 직접관찰·확인자료 / B 체험어장·양식권 등 간접자료 / C 지형·물때 후보(조과 미확인). 공식 물때·날씨를 우선 반영하며, 양식장·마을어장은 허가 없이 들어가거나 채취하면 안 됩니다.</p>
++            <p className="rank-method"><b>추천과 조과의 차이</b> 이 순위는 지형·물때·날씨·계절 가정을 이용한 참고 점수입니다. 실제 조과 확률이 아니며, 출처 없는 현장 경험과 양식권 가산은 적용하지 않습니다. 날짜와 출처가 있는 후기는 조과 기록 탭에서 확인하세요.</p>
+           </section>
+         </div>
+       )}
+@@ -1253,12 +1223,12 @@ export default function Home() {
+           </section>
+           <section className="section-card score-card">
+             <h2>4단계 판단 기준</h2>
+-            <div><b className="best">최상</b><p>물때·물색·날씨를 합산해 85점 이상</p></div>
+-            <div><b className="good">좋음</b><p>대체로 적합하지만 현장 확인이 필요한 날</p></div>
+-            <div><b className="middle">중간</b><p>노출 시간이나 날씨 중 하나가 아쉬운 날</p></div>
+-            <div><b className="bad">나쁨</b><p>강풍·강수 또는 물때가 맞지 않아 권하지 않는 날</p></div>
++            <div><b className="best">당장 가야 함</b><p>85점 이상~100점</p></div>
++            <div><b className="good">좋음</b><p>70점 이상~85점 미만</p></div>
++            <div><b className="middle">보통</b><p>50점 이상~70점 미만</p></div>
++            <div><b className="bad">비추</b><p>0점 이상~50점 미만</p></div>
+             <p className="formula-note">{SCORE_POLICY_DESCRIPTION}</p>
+-            <p className="formula-note">바람 10m/s 이상 또는 강한 비가 예상되면 물때 점수와 관계없이 ‘나쁨’으로 제한합니다.</p>
++            <p className="formula-note">바람 10m/s 이상 또는 강한 비가 예상되면 물때 점수와 관계없이 ‘비추’로 제한합니다.</p>
+           </section>
+           <div className="danger-box"><strong>해루질 지수는 안전을 보장하지 않아요.</strong><p>출발 전 기상특보와 현장 통제 여부를 다시 확인하고, 반드시 2인 이상 활동하며 들물 전에 철수하세요.</p></div>
+           <button className="data-guide-done" type="button" onClick={() => setShowDataGuide(false)}>확인</button>
+diff --git a/docs/catch-evidence.md b/docs/catch-evidence.md
+new file mode 100644
+index 0000000..ab23ec0
+--- /dev/null
++++ b/docs/catch-evidence.md
+@@ -0,0 +1,29 @@
++# 조과 기록 수집 기준 (2026-09-13)
++
++공개 원문 14건, 작성자 7명, 5개 시군구 권역. 출조 월을 본문·제목에서 확인한 12건만 월별 집계. 나머지 2건은 게시일만 확인되어 시기 미확인 목록에 보관한다. 표본은 수동으로 선별한 공개 블로그 후기이며 지역 전체를 대표하지 않는다. 카페·당근 자료를 수집했다고 주장하지 않는다.
++
++각 기록은 `lib/catch-evidence.ts`에 출처 URL, 작성자, 실제 출조일 또는 월, 시기 근거, 게시·수정일, 지역·장소, 채집 방식, 어종, 결과, 본문에 명시된 수량, 한계를 보관한다. 원문 텍스트를 읽어 확인했으며 사진의 개체 수나 종을 독립적으로 판별하지 않았다. 원문 사진은 복제하지 않는다.
++
++- 날짜 없는 게시물을 게시 월 실적으로 변환하지 않는다.
++- 5월 7일 게시된 십리포 낙지 글은 본문의 4월 중순으로 집계한다.
++- 몽산포 2025년 5월 작성자의 허탕과 이웃 가족의 성공을 분리한다. 이웃에게 받은 조개를 본인의 성공으로 세지 않는다.
++- 같은 URL, 같은 기록 ID, 동행인의 수량은 중복 건수로 세지 않는다. 교차 게시가 확인되면 한 원문으로 통합한다.
++- 낚시·통발 조과는 해루질 조과에서 제외한다. 유료 체험장은 방식에 표시한다.
++- 관찰·방생, 적은 조과, 못 잡음, 잡음을 구분한다. 수량 미기록을 0으로 채우지 않는다.
++- 현재는 성공률·성수기 확정·조과 점수 가산에 쓰지 않는다. 반복된 출조, 독립 작성자, 여러 해, 실패 사례, 활동 인원·시간을 확보한 뒤 검토한다.
++- 기존 코드의 링크 없는 FIELD_REPORT_BONUS·양식권 보너스·근거 A/B/C를 제거했다. 운영자 관찰 메모는 날짜·원문 미등록으로 설명만 유지한다. 지형·계절 추천은 조과 통계와 구분한다.
++- 공개 글이 있다고 해당 장소가 현재 채취 허용 구역인 것으로 판단하지 않는다.
++
++카페 기록 추가에 필요한 항목: 출조일, 지역·장소, 어종, 수량·단위(실패 시 0), 인원·시간, 채집 방식, 물색·물때(관측/회상 구분), 원문 링크, 공개 공유 가능 여부. 회원 전용 글과 개인정보는 공개 공유 범위를 확인하기 전 포함하지 않는다.
++
++# 과거 점수 오류 수정
++
++공개 앱의 2026-09-12 꾸지나무골 조회에서 ASOS HTTP 403으로 날씨만 실패함을 확인했다. 이미 연결된 기상청 날씨누리 강수 대체 경로는 작동했으나, 전체 과거 날씨에는 대체 경로가 없었다.
++
++기상청 공개 일별/요소별 관측표를 이용해 일평균기온, 일강수, 일평균풍속, 상대습도를 복원한다. 원 API 성공 시 일최대풍속을 쓰며 표시상 구분한다. 파고·물색은 결측으로 유지하고 관측 참고 점수에 미반영임을 명시한다. 이 과거 점수는 출조시간 예보와 같은 값이라고 주장하지 않는다. 조회 성공 자료는 6시간, 관측표는 10분 캐시하며 인증 403 반복 요청은 30분 쉬고 공개 경로로 간다.
++
++서산 2026-09-07은 일평균풍속이 결측이지만 시간별 실황표에서 22시간의 풍속을 확인했다. 이런 경우 동일 날짜·관측소의 시간별 표를 확인하여 관측된 시간 중 최대 풍속을 사용한다. 24시간 중 최소 20시간이고 6시간 단위 각 구간에 관측이 있어야 한다. 누락값을 0으로 채우지 않으며 화면에 `관측 22/24시간 중 최대 풍속`처럼 범위를 표시한다. 관측된 표본의 최대값이며 전체 일최대풍속·순간 돌풍과 동일하다고 주장하지 않는다. 응답이 현재 날짜나 다른 지점으로 바뀌었으면 거부한다.
++
++앞으로 브라우저에 마지막으로 확인한 예보 점수와 관측 참고 점수를 별도로 기록한다(최대 장소·날짜 조합 120개). 조회 실패를 새 등급으로 저장하지 않으며 이전 기록 표시에는 확인 시각을 붙인다. 기기별 저장이므로 다른 기기로 자동 동기화하지 않는다. 이번 수정 전 저장하지 않은 당시 예보 점수는 복원했다고 주장하지 않는다.
++
++점수 구간: 0≤점수<50 비추 / 50≤점수<70 보통 / 70≤점수<85 좋음 / 85≤점수≤100 당장 가야 함. 4·5·6물 +15, 9물·조금 −15, 다른 물때 0 및 물색 감점 유지.
+diff --git a/lib/catch-evidence.ts b/lib/catch-evidence.ts
+new file mode 100644
+index 0000000..00cadfb
+--- /dev/null
++++ b/lib/catch-evidence.ts
+@@ -0,0 +1,177 @@
++/** Curated public self-reports. Read at source on 2026-09-13; no automated harvesting. */
++export type CatchResult = "잡음" | "적은 조과" | "못 잡음" | "관찰·방생";
++export type CatchReport = {
++  id: string; url: string; title: string; author: string; platform: string;
++  postedOn: string; postedLabel?: string; caughtOn: string | null; caughtLabel: string; dateEvidence: string;
++  region: string; place: string; spotId: string | null; method: string;
++  catches: { species: string; result: CatchResult; quantity: string }[];
++  summary: string; conditions?: string; limitation: string;
++};
++export const CATCH_CHECKED_ON = "2026-09-13";
++export const CATCH_REPORTS: CatchReport[] = [
++  {
++    id: "hokahoka-simnipo-202604", platform: "티스토리", author: "hokahoka9",
++    url: "https://circle-85.tistory.com/entry/인천-영흥도의-낙지소라-포인트-십리포해수욕장어민-마찰X-포인트",
++    title: "영흥도 십리포 낙지·소라 후기", postedOn: "2026-05-07", caughtOn: "2026-04", caughtLabel: "2026년 4월 중순",
++    dateEvidence: "본문에 4월 중순 방문 명시. 5월 게시물을 5월 조과로 세지 않음.",
++    region: "인천 옹진", place: "영흥도 십리포", spotId: null, method: "워킹 해루질",
++    catches: [{species:"낙지",result:"잡음",quantity:"작성자 2마리·동료 2마리"},{species:"소라",result:"잡음",quantity:"작성자 2개"}],
++    summary: "작성자와 동료의 낙지 조과, 작성자의 소라 조과가 본문에 수량으로 제시됨.",
++    limitation: "동료의 조과도 같은 출조 1건으로 집계. 종명은 작성자 표현이며 독립적인 종 판별은 하지 않음.",
++  },
++  {
++    id: "hokahoka-seonnyeo-20260501", platform: "티스토리", author: "hokahoka9",
++    url: "https://circle-85.tistory.com/entry/인천-영종도-선녀바위해수욕장으로-해루질-다녀왔어요-백합이-잔뜩",
++    title: "선녀바위 백합 해루질 후기", postedOn: "2026-05-06", caughtOn: "2026-05-01", caughtLabel: "2026년 5월 1일",
++    dateEvidence: "본문의 5월 1일 방문 및 게시 연도 기준.", region: "인천 중구", place: "선녀바위", spotId: "seonnyeobawi", method: "워킹 해루질",
++    catches: [{species:"백합",result:"잡음",quantity:"수량 미기록"}], summary: "동료와 약 2시간 동안 채집한 결과를 소개. 정확한 개수나 무게는 쓰지 않음.",
++    conditions: "활동 약 2시간·동료와 동행(본문 기록)", limitation: "추가된 5월 중순 재방문도 같은 원문이므로 독립 출처로 중복 집계하지 않음. 백합은 작성자 종명.",
++  },
++  {
++    id: "hokahoka-sinduri-202604", platform: "티스토리", author: "hokahoka9",
++    url: "https://circle-85.tistory.com/entry/충남-태안-신두리해수욕장으로-해루질-다녀왔어요-골뱅이명주조개",
++    title: "신두리 골뱅이·명주조개 후기", postedOn: "2026-04-05", caughtOn: "2026-04", caughtLabel: "2026년 4월 초",
++    dateEvidence: "본문에 4월 초 방문 명시. 정확한 날짜는 없음.", region: "충남 태안", place: "신두리", spotId: "sinduri", method: "워킹 해루질",
++    catches: [{species:"골뱅이",result:"잡음",quantity:"수량 미기록"},{species:"명주조개",result:"잡음",quantity:"수량 미기록"},{species:"동죽",result:"관찰·방생",quantity:"3~4개 관찰·채취 여부 미기록"}],
++    summary: "명주조개를 먼저 채집했고 물이 더 빠진 뒤 골뱅이를 찾았다고 기록함.",
++    limitation: "동죽은 본문의 관찰 언급만 확인되어 잡은 수량으로 합산하지 않음.",
++  },
++  {
++    id: "hokahoka-hanagae-202603", platform: "티스토리", author: "hokahoka9",
++    url: "https://circle-85.tistory.com/entry/인천-무의도-하나개해수욕장으로-해루질-다녀왔어요-골뱅이주꾸미?category=1294852",
++    title: "하나개 골뱅이·주꾸미 후기", postedOn: "2026-03-23", caughtOn: "2026-03", caughtLabel: "2026년 3월 말",
++    dateEvidence: "본문에 3월 말 출조 명시. 게시일을 출조일로 대체하지 않음.", region: "인천 중구", place: "무의도 하나개", spotId: "muui_hanagae", method: "워킹 해루질",
++    catches: [{species:"골뱅이",result:"잡음",quantity:"큰 것 7개·중간 것 4개"},{species:"주꾸미",result:"잡음",quantity:"1마리"}],
++    summary: "작성자가 조과 수량을 기재했고 작은 골뱅이는 놓아주었다고 설명함.", conditions: "마이너스 물때라는 작성자 설명·조위 수치 미기록",
++    limitation: "이전 방문의 꽝 언급은 날짜와 횟수가 없어 별도 출조로 집계하지 않음.",
++  },
++  {
++    id: "hokahoka-seonnyeo-202509", platform: "티스토리", author: "hokahoka9",
++    url: "https://circle-85.tistory.com/entry/인천-해루질-초보자-포인트-후기주꾸미-소라-갑오징어-꽃게",
++    title: "선녀바위 9월 초 조과 후기", postedOn: "2025-09-14", caughtOn: "2025-09", caughtLabel: "2025년 9월 초",
++    dateEvidence: "본문에 9월 초 방문 명시. 게시일과 구분.", region: "인천 중구", place: "선녀바위", spotId: "seonnyeobawi", method: "워킹 해루질",
++    catches: [{species:"주꾸미",result:"잡음",quantity:"4마리"},{species:"갑오징어",result:"잡음",quantity:"1마리"},{species:"소라",result:"잡음",quantity:"15개"},{species:"꽃게",result:"잡음",quantity:"2마리"}],
++    summary: "작성자와 동료가 함께 잡은 수량. 목표였던 주꾸미는 작고 많이 보이지 않았다고 기록함.",
++    limitation: "개인별 조과로 나누지 않음. 한 번의 동행 출조이며 현재의 출입 가능 여부를 뜻하지 않음.",
++  },
++  {
++    id: "lifelog-mongsanpo-202505", platform: "개인 블로그", author: "Jongbin Oh / Lifelog",
++    url: "https://ohyecloudy.com/lifelog/archives/trip-mongsanpo-beach-may-2025/",
++    title: "몽산포 2025년 5월 가족여행", postedOn: "2025-06-14", postedLabel: "원문 수정일", caughtOn: "2025-05", caughtLabel: "2025년 5월 연휴",
++    dateEvidence: "제목의 2025년 5월과 본문의 5월 연휴 방문 기준.", region: "충남 태안", place: "몽산포", spotId: "mongsanpo", method: "갯벌 채집",
++    catches: [{species:"맛조개",result:"못 잡음",quantity:"작성자 허탕·정확한 수량 미기록"}],
++    summary: "작성자는 허탕을 기록. 이웃 가족이 잡아 건넨 맛조개는 작성자 자신의 조과와 구분함.",
++    limitation: "숙련된 이웃의 바구니 조과는 간접 관찰이라 별도의 성공 출조로 추가하지 않음.",
++  },
++  {
++    id: "uncheat-jinsanri-20240511", platform: "티스토리", author: "uncheat",
++    url: "https://uncheat.tistory.com/33", title: "진산리어촌계 맛조개·동죽 체험", postedOn: "2024-05-13", caughtOn: "2024-05-11", caughtLabel: "2024년 5월 11일",
++    dateEvidence: "본문에 방문일 5월 11일 토요일을 명시.", region: "충남 태안", place: "진산리어촌계", spotId: "jinsanri", method: "유료 갯벌체험",
++    catches: [{species:"맛조개",result:"잡음",quantity:"수량 미기록"},{species:"동죽",result:"잡음",quantity:"수량 미기록"}],
++    summary: "유료 체험장에서 맛조개 위주로 채집하고 동죽도 가져왔다고 기록함.", conditions: "10:40 시작·12:44 간조라는 작성자 기록",
++    limitation: "관리되는 유료 체험장 결과. 일반 해변의 자연 조과와 같은 조건으로 비교하지 않음.",
++  },
++  {
++    id: "lifelog-mongsanpo-20231008", platform: "개인 블로그", author: "Jongbin Oh / Lifelog",
++    url: "https://ohyecloudy.com/lifelog/archives/trip-mongsanpo-2023/", title: "몽산포 2023년 맛조개 가족여행",
++    postedOn: "2023-11-11", postedLabel: "원문 수정일", caughtOn: "2023-10-08", caughtLabel: "2023년 10월 8일",
++    dateEvidence: "제목의 2023년과 본문의 10월 8일 방문 기준.", region: "충남 태안", place: "몽산포", spotId: "mongsanpo", method: "갯벌 채집",
++    catches: [{species:"맛조개",result:"적은 조과",quantity:"1개·채집 중 파손"}],
++    summary: "맛조개 하나가 파손되었고 다른 조개는 이름을 몰랐다고 기록함.", conditions: "무시 물때라는 작성자 기록",
++    limitation: "이름 모를 조개는 어종 통계에 넣지 않음. 물때가 적은 조과의 원인이라는 해석은 검증되지 않음.",
++  },
++  {
++    id: "memory-dongbaek-20230305", platform: "티스토리", author: "어중남",
++    url: "https://memory1211.tistory.com/43", title: "기장 동백방파제 3월 워킹 해루질", postedOn: "2023-03-05", caughtOn: "2023-03-05", caughtLabel: "2023년 3월 5일",
++    dateEvidence: "제목에 출조 날짜 명시.", region: "부산 기장", place: "동백방파제", spotId: null, method: "워킹 해루질",
++    catches: [{species:"박하지",result:"잡음",quantity:"큰 개체 1마리"},{species:"성게",result:"잡음",quantity:"큰 개체 1개"},{species:"고동",result:"잡음",quantity:"수량 미기록"}],
++    summary: "부부가 함께 고동·성게를 채집했고 큰 박하지를 잡았다고 기록함.", limitation: "작성자 1인의 후기. 고동·성게는 본문의 통칭 그대로이며 세부 종은 미확인.",
++  },
++  {
++    id: "memory-dongbaek-20230205", platform: "티스토리", author: "어중남",
++    url: "https://memory1211.tistory.com/16", title: "기장 동백방파제 2월 워킹 해루질", postedOn: "2023-02-05", caughtOn: "2023-02-05", caughtLabel: "2023년 2월 4일 밤~5일 새벽",
++    dateEvidence: "제목의 2월 5일과 본문의 전날 밤~당일 새벽 출조 기준.", region: "부산 기장", place: "동백방파제", spotId: null, method: "워킹 해루질",
++    catches: [{species:"성게",result:"잡음",quantity:"2~3개 맛봄·나머지 방생, 총수량 미기록"}],
++    summary: "큰 수확은 없었으나 성게를 채집했으며 일부만 맛보고 방생했다고 기록함.", limitation: "현장에서 해삼 종패와 관련한 퇴거 요청을 받았다는 내용도 있음. 현재 채취 허용 정보로 쓰지 않음.",
++  },
++  {
++    id: "memory-sangyu-202302", platform: "티스토리", author: "어중남",
++    url: "https://memory1211.tistory.com/28", title: "거제 상유방파제 해루질·낚시 여행", postedOn: "2023-02-21", caughtOn: "2023-02", caughtLabel: "2023년 2월 18~21일 여행 중",
++    dateEvidence: "제목과 본문에 여행 기간 명시. 개별 해루질 일자는 없음.", region: "경남 거제", place: "상유방파제", spotId: null, method: "워킹 해루질",
++    catches: [{species:"대상 미상",result:"못 잡음",quantity:"해루질 조과 없음"}],
++    summary: "해루질로 얻은 것은 없었다고 기록. 같은 여행의 통발·낚시 조과는 제외함.", conditions: "바람이 매우 강했다는 작성자 기록",
++    limitation: "통발로 잡은 게와 물고기를 해루질 성과로 섞지 않음. 여행 1건이며 출조 횟수는 미확인.",
++  },
++  {
++    id: "sanjang-seonnyeo-20220517", platform: "티스토리", author: "산장보더",
++    url: "https://sanjangboarder.tistory.com/294", title: "선녀바위 2022년 5월 해루질", postedOn: "2022-05-24", caughtOn: "2022-05-17", caughtLabel: "2022년 5월 17일",
++    dateEvidence: "제목과 본문에 5월 17일 출조 명시.", region: "인천 중구", place: "선녀바위", spotId: "seonnyeobawi", method: "워킹 해루질",
++    catches: [{species:"골뱅이",result:"적은 조과",quantity:"수량 미기록"},{species:"소라",result:"관찰·방생",quantity:"발견 언급·보유 수량 미기록"},{species:"주꾸미",result:"관찰·방생",quantity:"방생 기록"}],
++    summary: "골뱅이가 기대보다 적고 작은 개체가 많았다고 기록. 주꾸미는 방생함.",
++    limitation: "낙지는 다음 출조 목표로만 언급되어 잡힌 어종에 포함하지 않음.",
++  },
++  {
++    id: "witram-mongsanpo-undated", platform: "티스토리", author: "뢈필이",
++    url: "https://witram.tistory.com/entry/몽산포해루질", title: "몽산포 박하지·낙지 후기", postedOn: "2021-10-12", caughtOn: null, caughtLabel: "실제 출조일 미기록",
++    dateEvidence: "게시일만 확인됨. 10월 조과로 추정 집계하지 않음.", region: "충남 태안", place: "몽산포항 주변", spotId: "mongsanpo", method: "워킹 해루질",
++    catches: [{species:"박하지",result:"잡음",quantity:"수량 미기록"},{species:"낙지",result:"잡음",quantity:"수량 미기록"},{species:"꽃게",result:"못 잡음",quantity:"포기·수량 미기록"},{species:"광어",result:"못 잡음",quantity:"포기·수량 미기록"}],
++    summary: "흐린 물로 꽃게·광어를 포기하고 이동한 뒤 박하지와 낙지를 잡았다고 기록함.", conditions: "물이 뒤집혀 보이지 않았다는 작성자 기록",
++    limitation: "날짜 미확인으로 월별 집계 제외. 물색과 조과의 인과관계를 입증하는 자료는 아님.",
++  },
++  {
++    id: "mlstoryer-deuruni-undated", platform: "티스토리", author: "MLstoryer",
++    url: "https://mlstoryer.tistory.com/455", title: "드르니항·연육교 해루질과 루어 조행기", postedOn: "2017-05-29", caughtOn: null, caughtLabel: "출조 날짜 추가 확인 필요",
++    dateEvidence: "본문에 이번 주·토요일만 있어 정확한 출조일은 확정하지 않음. 월별 집계 제외.", region: "충남 태안", place: "드르니항·연육교 주변", spotId: "deuruni", method: "해루질(낚시 병행)",
++    catches: [{species:"낙지",result:"잡음",quantity:"본문 두 차례 기록: 3마리·2마리"},{species:"소라",result:"적은 조과",quantity:"몇 개·정확한 수량 미기록"}],
++    summary: "해루질과 루어낚시를 나눠 기록. 낙지·소라만 정리하고 루어 광어·우럭은 제외함.", limitation: "오래된 원문 1건으로 여러 출조가 함께 기술됨. 5월 낙지 성수기의 확정 근거로 쓰지 않음.",
++  },
++];
++
++export type CatchFilter = { region?: string; species?: string; year?: string; month?: number; spotId?: string };
++export function uniqueReports(reports: CatchReport[]) {
++  const ids = new Set<string>();
++  const urls = new Set<string>();
++  return reports.filter(report => {
++    const url = new URL(report.url);
++    const canonical = `${url.origin}${decodeURI(url.pathname).replace(/\/$/, "")}`;
++    if (ids.has(report.id) || urls.has(canonical)) return false;
++    ids.add(report.id); urls.add(canonical); return true;
++  });
++}
++export function filterCatchReports(reports: CatchReport[], filter: CatchFilter = {}) {
++  return uniqueReports(reports).filter(report =>
++    (!filter.region || report.region === filter.region) &&
++    (!filter.spotId || report.spotId === filter.spotId) &&
++    (!filter.species || report.catches.some(item => item.species === filter.species)) &&
++    (!filter.year || report.caughtOn?.slice(0, 4) === filter.year) &&
++    (!filter.month || Number(report.caughtOn?.slice(5, 7)) === filter.month)
++  ).sort((a, b) => (b.caughtOn ?? "").localeCompare(a.caughtOn ?? "") || b.postedOn.localeCompare(a.postedOn));
++}
++export function monthlyEvidence(reports: CatchReport[], filter: CatchFilter = {}) {
++  const selected = filterCatchReports(reports, { ...filter, month: undefined });
++  return Array.from({ length: 12 }, (_, i) => {
++    const rows = selected.filter(report => Number(report.caughtOn?.slice(5, 7)) === i + 1);
++    return { month: i + 1, reports: rows.length, authors: new Set(rows.map(report => report.author)).size };
++  });
++}
++export function regionalEvidence(reports: CatchReport[], species = "") {
++  const groups = new Map<string, { region: string; place: string; month: number; species: string; caught: Set<string>; poor: Set<string>; none: Set<string>; observed: Set<string>; authors: Set<string>; years: Set<string> }>();
++  for (const report of uniqueReports(reports)) {
++    if (!report.caughtOn) continue;
++    for (const item of report.catches) {
++      if (species && item.species !== species) continue;
++      const month = Number(report.caughtOn.slice(5, 7));
++      const key = `${report.region}/${report.place}/${month}/${item.species}`;
++      const row = groups.get(key) ?? { region: report.region, place: report.place, month, species: item.species, caught: new Set<string>(), poor: new Set<string>(), none: new Set<string>(), observed: new Set<string>(), authors: new Set<string>(), years: new Set<string>() };
++      const bucket = item.result === "잡음" ? row.caught : item.result === "적은 조과" ? row.poor : item.result === "못 잡음" ? row.none : row.observed;
++      bucket.add(report.id); row.authors.add(report.author); row.years.add(report.caughtOn.slice(0,4)); groups.set(key, row);
++    }
++  }
++  return [...groups.values()].sort((a,b) => a.month - b.month || a.region.localeCompare(b.region, "ko") || a.place.localeCompare(b.place,"ko"));
++}
++export function catchReportsCsv(reports: CatchReport[]) {
++  const rows: (string | number)[][] = [["지역","장소","실제 출조 시기","시기 근거","게시·수정일","방식","어종","결과","수량(작성자 기준)","작성자","원문","한계","원문 확인일"]];
++  for (const report of uniqueReports(reports)) for (const item of report.catches) rows.push([report.region,report.place,report.caughtLabel,report.dateEvidence,report.postedOn,report.method,item.species,item.result,item.quantity,report.author,report.url,report.limitation,CATCH_CHECKED_ON]);
++  const cell = (value: string | number) => `"${String(value).replace(/^[=+@-]/, "'$&").replaceAll('"','""')}"`;
++  return "\uFEFF" + rows.map(row => row.map(cell).join(",")).join("\r\n");
++}
+diff --git a/lib/historical-weather.ts b/lib/historical-weather.ts
+new file mode 100644
+index 0000000..f2f8f8c
+--- /dev/null
++++ b/lib/historical-weather.ts
+@@ -0,0 +1,67 @@
++/** Parse the public KMA observation tables without executing their scripts. */
++const clean = (value: string) => value.replace(/<[^>]*>/g," ").replace(/&nbsp;|&#160;/g," ").replace(/\s+/g," ").trim();
++export type DailyObservation = { temperature: number; rain: number; cloud: number | null };
++export function parseDailyObservations(html: string, year: string, month: string) {
++  const table = html.match(/<table\b[^>]*class=["'][^"']*\btable-cal\b[^"']*["'][^>]*>([\s\S]*?)<\/table>/i)?.[1];
++  if (!table) throw new Error("기상청 일별 관측 표 없음");
++  const rows = [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(match => match[1]);
++  const result = new Map<string, DailyObservation>();
++  const cells = (row: string) => [...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(match => clean(match[1]));
++  for (let i=0;i<rows.length-1;i++) {
++    const days = cells(rows[i]).map(cell => cell.match(/^(\d{1,2})일$/)?.[1]);
++    if (!days.some(Boolean)) continue;
++    const values = cells(rows[i+1]);
++    if (values.length !== days.length) continue;
++    days.forEach((day,index) => {
++      if (!day) return;
++      const text = values[index];
++      const temperature = text.match(/평균기온:\s*(-?\d+(?:\.\d+)?)\s*℃/);
++      const rain = text.match(/일강수량:\s*(\d+(?:\.\d+)?\s*mm|-)(?:\s|$)/);
++      const cloud = text.match(/평균운량:\s*(\d+(?:\.\d+)?)/);
++      // A completed daily temperature is required before a dash can mean no rain.
++      if (!temperature || !rain) return;
++      result.set(`${year}-${month.padStart(2,"0")}-${day.padStart(2,"0")}`, {temperature:Number(temperature[1]), rain:rain[1] === "-" ? 0 : parseFloat(rain[1]), cloud: cloud ? Number(cloud[1]) : null});
++    });
++  }
++  return result;
++}
++export function parseElementObservations(html: string, year: string, element: "wind" | "humidity") {
++  const table = html.match(/<table\b[^>]*id=["']weather_table["'][^>]*>([\s\S]*?)<\/table>/i)?.[1];
++  if (!table) throw new Error("기상청 요소별 관측 표 없음");
++  const result = new Map<string, number>();
++  for (const row of table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
++    const cells = [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(match => match[1]);
++    const day = clean(cells[0] ?? "").match(/^(\d{1,2})일$/)?.[1];
++    if (!day || cells.length !== 13) continue;
++    for(let month=1;month<=12;month++) {
++      const value = element === "wind" ? cells[month].match(/writeWindSpeed\(\s*['"](\d+(?:\.\d+)?)['"]/)?.[1] : clean(cells[month]).match(/^(\d+(?:\.\d+)?)$/)?.[1];
++      if (value === undefined) continue;
++      const number = Number(value);
++      if (element === "humidity" && number > 100) continue;
++      const date = `${year}-${String(month).padStart(2,"0")}-${day.padStart(2,"0")}`;
++      if (new Date(`${date}T00:00:00Z`).toISOString().slice(0,10) !== date) continue;
++      result.set(date, number);
++    }
++  }
++  return result;
++}
++
++/** The city table may silently reset a query; require the returned date and station. */
++export function parseHourlyWind(html: string, date: string, station: string) {
++  const inputs = [...html.matchAll(/<input\b[^>]*>/gi)].map(match => match[0]);
++  const inputValue = (name: string) => inputs.find(tag => new RegExp(`\\bname=["']${name}["']`).test(tag))?.match(/\bvalue=["']([^"']*)["']/)?.[1];
++  if (inputValue("tm") !== `${date.replaceAll("-", ".")}.23:00` || inputValue("stn") !== station) throw new Error("기상청 시간별 관측의 날짜·지점 불일치");
++  const table = html.match(/<table\b[^>]*id=["']weather_table["'][^>]*>([\s\S]*?)<\/table>/i)?.[1];
++  if (!table) throw new Error("기상청 시간별 관측 표 없음");
++  const hours = new Map<number, number>();
++  for (const row of table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
++    const cells = [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(match => match[1]);
++    const time = clean(cells[0] ?? "").match(/^(\d{1,2})\.(\d{1,2})H$/);
++    if (!time || Number(time[1]) !== Number(date.slice(8)) || Number(time[2]) > 23) continue;
++    const value = row[1].match(/writeWindSpeed\(\s*['"](\d+(?:\.\d+)?)['"]/)?.[1];
++    if (value !== undefined) hours.set(Number(time[2]), Number(value));
++  }
++  // Sparse observations must not be promoted into a whole-day rating.
++  if (hours.size < 20 || [0,6,12,18].some(start => ![...hours.keys()].some(hour => hour >= start && hour < start + 6))) throw new Error("시간별 풍속 관측이 충분하지 않아요");
++  return {wind:Math.max(...hours.values()),hours:hours.size};
++}
+diff --git a/lib/score-history.ts b/lib/score-history.ts
+new file mode 100644
+index 0000000..ee0526b
+--- /dev/null
++++ b/lib/score-history.ts
+@@ -0,0 +1,35 @@
++/** Previous ratings are historical records, never a replacement for fresh weather. */
++export type RecordedScore = { score: number; rating: string; checkedAt: string; kind: "forecast" | "observation"; note?: string };
++export type ScoreHistory = { forecast?: RecordedScore; observation?: RecordedScore };
++type StorageLike = { getItem(key: string): string | null; setItem(key: string, value: string): void };
++const KEY = "kkirikiri-score-history-v1";
++const validDate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date));
++function validRecord(value: unknown): value is RecordedScore {
++  if (!value || typeof value !== "object") return false;
++  const v = value as RecordedScore;
++  return Number.isFinite(v.score) && v.score >= 0 && v.score <= 100 && typeof v.rating === "string" && v.rating.length < 30 && Number.isFinite(Date.parse(v.checkedAt)) && ["forecast","observation"].includes(v.kind);
++}
++export function readScoreHistory(storage: StorageLike, location: string, date: string): ScoreHistory {
++  try {
++    const all = JSON.parse(storage.getItem(KEY) ?? "{}");
++    const row = all[`${location}:${date}`];
++    return {forecast:validRecord(row?.forecast) ? row.forecast : undefined,observation:validRecord(row?.observation) ? row.observation : undefined};
++  } catch { return {}; }
++}
++export function saveScoreHistory(storage: StorageLike, input: unknown, location: string, date: string): ScoreHistory {
++  const previous = readScoreHistory(storage,location,date);
++  if (!input || typeof input !== "object" || !validDate(date)) return previous;
++  const value = input as {locationId?: string; date?: string; score?: number; rating?: string; scoreNote?: string; sourceStatus?: {tide?: boolean;weather?: boolean}; tidePreview?: boolean; pendingSources?: Record<string,boolean>; updatedAt?: string; weather?:{kind?:string};};
++  if (value.locationId !== location || value.date !== date || !value.sourceStatus?.tide || !value.sourceStatus?.weather || value.tidePreview || Object.values(value.pendingSources ?? {}).some(Boolean)) return previous;
++  const record = {score:value.score,rating:value.rating,checkedAt:value.updatedAt,kind:value.weather?.kind,note:value.scoreNote};
++  if (!validRecord(record)) return previous;
++  const next = {...previous,[record.kind]:record};
++  try {
++    const raw = JSON.parse(storage.getItem(KEY) ?? "{}");
++    const all: Record<string,ScoreHistory> = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
++    all[`${location}:${date}`] = next;
++    const ordered = Object.entries(all).sort(([,a],[,b]) => (b.observation?.checkedAt ?? b.forecast?.checkedAt ?? "").localeCompare(a.observation?.checkedAt ?? a.forecast?.checkedAt ?? "")).slice(0,120);
++    storage.setItem(KEY,JSON.stringify(Object.fromEntries(ordered)));
++  } catch { /* Storage failure does not affect live results. */ }
++  return next;
++}
+diff --git a/lib/score-policy.ts b/lib/score-policy.ts
+index d27bf0b..d5067b9 100644
+--- a/lib/score-policy.ts
++++ b/lib/score-policy.ts
+@@ -21,3 +21,9 @@ export function signedPoints(value: number | null | undefined) {
+ }
+ 
+ export const SCORE_POLICY_DESCRIPTION = "기본 60점 + 날씨 최대 25점. 4·5·6물 +15점, 9물·조금 −15점, 나머지 물때는 0점. 물색은 약간 흐림 −10점, 많이 흐림 −20점, 커피물 가능성 큼 −30점. 최종 점수는 0~100점입니다.";
++
++export type ScoreRating = "비추" | "보통" | "좋음" | "당장 가야 함";
++/** Lower-inclusive bands: 50, 70 and 85 belong to the next band. */
++export function getScoreRating(score: number): ScoreRating {
++  return score >= 85 ? "당장 가야 함" : score >= 70 ? "좋음" : score >= 50 ? "보통" : "비추";
++}
+diff --git a/lib/use-conditions.ts b/lib/use-conditions.ts
+index 04aa94c..52ed006 100644
+--- a/lib/use-conditions.ts
++++ b/lib/use-conditions.ts
+@@ -1,6 +1,7 @@
+ "use client";
+ import { useEffect, useState } from "react";
+ import { fetchConditions } from "./conditions-client";
++import { readScoreHistory, saveScoreHistory, type ScoreHistory } from "./score-history";
+ import { readSavedTide, saveTide, type SavedTide } from "./tide-startup-cache";
+ 
+ const kstFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" });
+@@ -18,11 +19,13 @@ export function useKstToday() {
+ 
+ export function useConditions<T>(location: string, date: string, enabled = true) {
+   const key = `${location}:${date}`;
++  const [scoreHistory, setScoreHistory] = useState<{key:string;value:ScoreHistory}>({key:"",value:{}});
+   const [saved, setSaved] = useState<{ key: string; value: SavedTide | null }>({ key: "", value: null });
+   const [state, setState] = useState<{ key: string; data: T | null; loading: boolean; error: string }>({ key: "", data: null, loading: true, error: "" });
+   useEffect(() => {
+     if (!enabled) return;
+     let active = true;
++    try { setScoreHistory({key,value:readScoreHistory(window.localStorage,location,date)}); } catch { setScoreHistory({key,value:{}}); }
+     try { setSaved({ key, value: readSavedTide(window.localStorage, location, date) }); } catch { setSaved({ key, value: null }); }
+     const rememberTide = (value: T) => {
+       try { const tide = saveTide(window.localStorage, value, location, date); if (tide) setSaved({ key, value: tide }); } catch { /* Browser storage may be disabled. */ }
+@@ -41,7 +44,9 @@ export function useConditions<T>(location: string, date: string, enabled = true)
+         const data = await fetchConditions<T>(location, date, request.signal, partial => {
+           if (active && controller === request && !request.signal.aborted) { rememberTide(partial); setState({ key, data: partial, loading: true, error: "" }); }
+         });
+-        if (active && controller === request && !request.signal.aborted) { rememberTide(data); setState({ key, data, loading: false, error: "" }); }
++        if (active && controller === request && !request.signal.aborted) { rememberTide(data);
++          try { setScoreHistory({key,value:saveScoreHistory(window.localStorage,data,location,date)}); } catch { /* No storage access. */ }
++          setState({ key, data, loading: false, error: "" }); }
+       } catch {
+         if (active && controller === request) setState({ key, data: null, loading: false, error: "자료를 확인하지 못했어요. 잠시 후 다시 확인해 주세요." });
+       } finally { clearTimeout(timeout); if (controller === request) controller = null; }
+@@ -51,5 +56,5 @@ export function useConditions<T>(location: string, date: string, enabled = true)
+     window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
+     return () => { active = false; controller?.abort(); clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+   }, [location, date, enabled, key]);
+-  return { ...(enabled && state.key === key ? state : { key, data: null, loading: enabled, error: "" }), savedTide: enabled && saved.key === key && saved.value && Date.now() - Date.parse(saved.value.tideRetrievedAt) < 6 * 60 * 60_000 ? saved.value : null };
++  return { scoreHistory: enabled && scoreHistory.key === key ? scoreHistory.value : {}, ...(enabled && state.key === key ? state : { key, data: null, loading: enabled, error: "" }), savedTide: enabled && saved.key === key && saved.value && Date.now() - Date.parse(saved.value.tideRetrievedAt) < 6 * 60 * 60_000 ? saved.value : null };
+ }
+diff --git a/tests/catch-evidence.test.mjs b/tests/catch-evidence.test.mjs
+new file mode 100644
+index 0000000..f2e52cf
+--- /dev/null
++++ b/tests/catch-evidence.test.mjs
+@@ -0,0 +1,32 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {CATCH_REPORTS,filterCatchReports,monthlyEvidence,regionalEvidence,catchReportsCsv} from '../lib/catch-evidence.ts';
++import {getScoreRating} from '../lib/score-policy.ts';
++test('all records have traceable, unique, public sources and explicit date basis',()=>{
++ assert.equal(new Set(CATCH_REPORTS.map(r=>r.id)).size,CATCH_REPORTS.length);
++ for(const r of CATCH_REPORTS){assert.equal(new URL(r.url).protocol,'https:');assert.ok(r.author&&r.dateEvidence&&r.limitation);if(r.caughtOn)assert.match(r.caughtOn,/^\d{4}-\d{2}(-\d{2})?$/);}
++ assert.equal(CATCH_REPORTS.length,14);assert.equal(new Set(CATCH_REPORTS.map(r=>r.region)).size,5);
++});
++test('May-published octopus report belongs to April; undated May post is excluded',()=>{
++ const may=filterCatchReports(CATCH_REPORTS,{species:'낙지',month:5});assert.equal(may.length,0);
++ const april=filterCatchReports(CATCH_REPORTS,{species:'낙지',month:4});assert.equal(april.length,1);assert.equal(april[0].postedOn,'2026-05-07');
++ assert.equal(monthlyEvidence(CATCH_REPORTS).reduce((n,r)=>n+r.reports,0),12);
++});
++test('source duplicates and fellow participants do not inflate record counts',()=>{
++ const r=CATCH_REPORTS[0];const clone={...r,id:'copied-post',url:r.url+'?category=42'};
++ assert.equal(filterCatchReports([r,r,clone]).length,1);assert.equal(regionalEvidence([r,r,clone],'낙지')[0].caught.size,1);
++});
++test('zero catches, low catches and observations remain distinct; trap fish excluded',()=>{
++ const records=filterCatchReports(CATCH_REPORTS,{spotId:'mongsanpo',species:'맛조개'});
++ const rows=regionalEvidence(records,'맛조개');assert.equal(rows.find(r=>r.month===5).none.size,1);assert.equal(rows.find(r=>r.month===10).poor.size,1);
++ assert.deepEqual(filterCatchReports(CATCH_REPORTS,{region:'경남 거제'})[0].catches.map(r=>r.result),['못 잡음']);
++ assert.equal(regionalEvidence(filterCatchReports(CATCH_REPORTS,{year:'2022'}),'주꾸미')[0].observed.size,1);
++});
++test('filters compose and CSV carries full source/date/quantity context',()=>{
++ const rows=filterCatchReports(CATCH_REPORTS,{year:'2024',month:5,region:'충남 태안',species:'맛조개'});assert.equal(rows.length,1);assert.equal(rows[0].caughtOn,'2024-05-11');
++ assert.equal(filterCatchReports(CATCH_REPORTS,{spotId:'gujina'}).length,0);
++ const csv=catchReportsCsv(rows);assert.ok(csv.startsWith('\uFEFF'));assert.ok(csv.includes('https://uncheat.tistory.com/33'));assert.ok(csv.includes('수량 미기록'));
++});
++test('rating boundaries use latest requested 50/70/85 policy',()=>{
++ for(const [n,label] of [[0,'비추'],[49.9,'비추'],[50,'보통'],[69.9,'보통'],[70,'좋음'],[80,'좋음'],[84.9,'좋음'],[85,'당장 가야 함'],[100,'당장 가야 함']])assert.equal(getScoreRating(n),label);
++});
+diff --git a/tests/historical-weather.test.mjs b/tests/historical-weather.test.mjs
+new file mode 100644
+index 0000000..37e61cd
+--- /dev/null
++++ b/tests/historical-weather.test.mjs
+@@ -0,0 +1,75 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {parseDailyObservations,parseElementObservations,parseHourlyWind} from '../lib/historical-weather.ts';
++import {saveScoreHistory,readScoreHistory} from '../lib/score-history.ts';
++const daily='<table class="table-col table-cal"><tr><td>1일</td><td>2일</td><td>3일</td></tr><tr><td>평균기온:21.4℃ 최고기온:27.2℃ 평균운량:8.6 일강수량: - </td><td>평균기온:18.2℃ 평균운량:8.0 일강수량:12.3mm </td><td>평균기온: 최고기온:23.0℃ 일강수량: - </td></tr></table>';
++function table(value){return '<table id="weather_table"><tr><td>1일</td>'+Array.from({length:12},(_,i)=>`<td>${i===8?value:'&nbsp;'}</td>`).join('')+'</tr></table>';}
++test('daily KMA parser keeps month/day and distinguishes missing from dry weather',()=>{
++ const rows=parseDailyObservations(daily,'2026','09');assert.equal(rows.get('2026-09-01').rain,0);assert.equal(rows.get('2026-09-02').rain,12.3);assert.equal(rows.has('2026-09-03'),false);assert.equal(rows.size,2);
++});
++test('element parser reads raw m/s without executing display script, blanks remain missing',()=>{
++ assert.equal(parseElementObservations(table("<script>writeWindSpeed('1.1', false,'','',1);</script>"),'2026','wind').get('2026-09-01'),1.1);
++ assert.equal(parseElementObservations(table('<span>72.3</span>'),'2026','humidity').get('2026-09-01'),72.3);
++ assert.equal(parseElementObservations(table("<script>writeWindSpeed('&amp;nbsp;', false,'','',1);</script>"),'2026','wind').size,0);
++});
++const hourlyTable=(date='2026-09-07',station='129',count=22)=>`<input name="stn" value="${station}"><input name="tm" value="${date.replaceAll('-','.')}.23:00"><table id="weather_table">`+Array.from({length:24},(_,i)=>`<tr><td>${Number(date.slice(8))}.${String(i).padStart(2,'0')}H</td><td><script>writeWindSpeed('${i<count?(i===0?'0.0':'3.5'):'&amp;nbsp;'}',false,'','',1);</script></td></tr>`).join('')+'</table>';
++test('hourly wind keeps observed maximum and coverage; rejects wrong date, station and sparse data',()=>{
++ assert.deepEqual(parseHourlyWind(hourlyTable(),'2026-09-07','129'),{wind:3.5,hours:22});
++ assert.throws(()=>parseHourlyWind(hourlyTable(),'2026-09-08','129'),/날짜·지점/);
++ assert.throws(()=>parseHourlyWind(hourlyTable(),'2026-09-07','112'),/날짜·지점/);
++ assert.throws(()=>parseHourlyWind(hourlyTable('2026-09-07','129',12),'2026-09-07','129'),/충분하지/);
++});
++function storage(){let raw='{}';return {getItem(){return raw},setItem(k,v){raw=v}};}
++const sample={locationId:'gujina',date:'2026-09-12',sourceStatus:{tide:true,weather:true},score:75,rating:'좋음',updatedAt:'2026-09-11T10:00:00Z',weather:{kind:'forecast'}};
++test('a failed refresh cannot erase a known rating; observation and forecast are kept separately',()=>{
++ const store=storage();saveScoreHistory(store,sample,'gujina',sample.date);saveScoreHistory(store,{...sample,score:0,sourceStatus:{tide:true,weather:false}},'gujina',sample.date);
++ assert.equal(readScoreHistory(store,'gujina',sample.date).forecast.score,75);
++ saveScoreHistory(store,{...sample,score:65,rating:'보통',weather:{kind:'observation'}},'gujina',sample.date);
++ const result=readScoreHistory(store,'gujina',sample.date);assert.equal(result.forecast.rating,'좋음');assert.equal(result.observation.score,65);
++ assert.deepEqual(readScoreHistory(store,'other',sample.date),{forecast:undefined,observation:undefined});
++});
++test('unfinished, mismatched, invalid and blocked-storage results never become historical scores',()=>{
++ const store=storage();for(const value of [{...sample,tidePreview:true},{...sample,pendingSources:{recentRain:true}},{...sample,date:'2026-09-13'},{...sample,score:NaN}]){saveScoreHistory(store,value,'gujina',sample.date);assert.equal(readScoreHistory(store,'gujina',sample.date).forecast,undefined);}
++ const blocked={getItem(){throw Error('blocked')},setItem(){throw Error('blocked')}};assert.doesNotThrow(()=>saveScoreHistory(blocked,sample,'gujina',sample.date));
++});
++
++test('built API recovers ASOS 403 using dated public KMA observations',async()=>{
++ const original=globalThis.fetch,old=process.env.PUBLIC_DATA_API_KEY;process.env.PUBLIC_DATA_API_KEY='fixture-key';
++ const day=new Date(Date.now()-86400000);const target=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(day);const [year,month,date]=target.split('-');
++ const dailyHtml=`<table class="table-cal"><tr><td>${Number(date)}일</td></tr><tr><td>평균기온:21.4℃ 평균운량:8.6 일강수량: - </td></tr></table>`;
++ const elementHtml=value=>'<table id="weather_table"><tr><td>'+Number(date)+'일</td>'+Array.from({length:12},(_,i)=>'<td>'+(i===Number(month)-1?value:'&nbsp;')+'</td>').join('')+'</tr></table>';
++ let pageCalls=0;
++ globalThis.fetch=async input=>{
++  const u=new URL(String(input));
++  if(u.pathname.includes('AsosDalyInfoService'))return new Response('',{status:403});
++  if(u.pathname.includes('obs-by-day.do')){pageCalls++;return new Response(dailyHtml);}
++  if(u.pathname.includes('obs-by-element.do')){pageCalls++;return new Response(elementHtml(u.searchParams.get('obs')==='06'?"<script>writeWindSpeed('1.1',false,'','',1);</script>":'72.3'));}
++  if(u.pathname.includes('tideFcstHghLw'))return new Response(JSON.stringify({response:{header:{resultCode:'00'},body:{items:{item:['04:00','10:00','16:00','22:00'].map((time,i)=>({predcDt:target+' '+time,predcTdlvVl:i%2?'70':'620',extrSe:String(i+1)}))}}}}));
++  return new Response('',{status:503});
++ };
++ try{
++  const worker=(await import('../dist/server/index.js?historical-fallback-test')).default;
++  const data=await (await worker.fetch(new Request('http://localhost/api/conditions?location=anheung&date='+target),{ASSETS:{fetch:async()=>new Response('',{status:404})}},{waitUntil(){},passThroughOnException(){}})).json();
++  assert.equal(data.sourceStatus.weather,true);assert.equal(data.weather.kind,'observation');assert.equal(data.weather.temperature,21.4);assert.equal(data.weather.wind,1.1);assert.equal(data.weather.windBasis,'daily-mean');assert.equal(data.weather.waveHeight,null);assert.ok(Number.isFinite(data.score));assert.match(data.scoreNote,/파고·물색 미반영/);assert.ok(pageCalls>=3);assert.equal(data.sourceErrors?.weather,undefined);
++ }finally{globalThis.fetch=original;if(old===undefined)delete process.env.PUBLIC_DATA_API_KEY;else process.env.PUBLIC_DATA_API_KEY=old;}
++});
++
++test('built API recovers missing daily wind with correctly dated hourly observations',async()=>{
++ const original=globalThis.fetch,old=process.env.PUBLIC_DATA_API_KEY;process.env.PUBLIC_DATA_API_KEY='fixture-key';
++ const target=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date(Date.now()-2*86400000));const [year,month,date]=target.split('-');
++ const elementHtml=value=>'<table id="weather_table"><tr><td>'+Number(date)+'일</td>'+Array.from({length:12},(_,i)=>'<td>'+(i===Number(month)-1?value:'&nbsp;')+'</td>').join('')+'</tr></table>';
++ globalThis.fetch=async input=>{
++  const u=new URL(String(input));
++  if(u.pathname.includes('AsosDalyInfoService'))return new Response('',{status:403});
++  if(u.pathname.includes('obs-by-day.do'))return new Response(`<table class="table-cal"><tr><td>${Number(date)}일</td></tr><tr><td>평균기온:22.7℃ 평균운량:0.0 일강수량: - </td></tr></table>`);
++  if(u.pathname.includes('obs-by-element.do'))return new Response(elementHtml(u.searchParams.get('obs')==='06'?"<script>writeWindSpeed('&amp;nbsp;',false,'','',1);</script>":'67.1'));
++  if(u.pathname.includes('city-obs.do'))return new Response(hourlyTable(target,u.searchParams.get('stn')));
++  if(u.pathname.includes('tideFcstHghLw'))return new Response(JSON.stringify({response:{header:{resultCode:'00'},body:{items:{item:['04:00','10:00','16:00','22:00'].map((time,i)=>({predcDt:target+' '+time,predcTdlvVl:i%2?'70':'620',extrSe:String(i+1)}))}}}}));
++  return new Response('',{status:503});
++ };
++ try{
++  const worker=(await import('../dist/server/index.js?hourly-fallback-test')).default;
++  const data=await (await worker.fetch(new Request('http://localhost/api/conditions?location=anheung&date='+target),{ASSETS:{fetch:async()=>new Response('',{status:404})}},{waitUntil(){},passThroughOnException(){}})).json();
++  assert.equal(data.sourceStatus.weather,true);assert.equal(data.weather.wind,3.5);assert.equal(data.weather.windBasis,'hourly-maximum');assert.equal(data.weather.windObservationHours,22);assert.match(data.scoreNote,/22\/24시간/);assert.equal(data.sourceErrors?.weather,undefined);
++ }finally{globalThis.fetch=original;if(old===undefined)delete process.env.PUBLIC_DATA_API_KEY;else process.env.PUBLIC_DATA_API_KEY=old;}
++});
+diff --git a/tests/score-policy.test.mjs b/tests/score-policy.test.mjs
+index 6f621fe..c692fc8 100644
+--- a/tests/score-policy.test.mjs
++++ b/tests/score-policy.test.mjs
+@@ -91,6 +91,6 @@ test('built API subtracts murky water, keeps missing water unknown, and retains
+   assert.equal(unknown.scoreBreakdown.visibility, null);
+   const dangerous = await call({date,rain:0,wind:10,wave:0});
+   assert.ok(dangerous.score <= 34);
+-  assert.equal(dangerous.rating, '나쁨');
++  assert.equal(dangerous.rating, '비추');
+   assert.ok(dangerous.riskFlags.includes('강풍 위험'));
+ }));

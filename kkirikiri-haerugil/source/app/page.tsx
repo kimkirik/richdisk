@@ -7,14 +7,16 @@ import { createComparisonCache, mapConcurrent } from "../lib/conditions-client";
 import { getMulTtae } from "../lib/tide-calendar";
 import { SPOTS } from "../lib/spots";
 import { getWaterVisibility } from "../lib/water-visibility";
-import { getTideAdjustment, getVisibilityAdjustment, signedPoints, SCORE_POLICY_DESCRIPTION } from "../lib/score-policy";
+import { getTideAdjustment, getVisibilityAdjustment, signedPoints, SCORE_POLICY_DESCRIPTION, getScoreRating, type ScoreRating } from "../lib/score-policy";
 import { explainRain, explainWave, explainWind } from "../lib/weather-feel";
 import { tidePointFor } from "../lib/tide-points";
 import { PwaInstallButton } from "./pwa-install-button";
 import { SpeciesIcon } from "./species-icon";
+import { CatchHistory } from "./catch-history";
 
 type Tide = { time: string; height: number; type: "high" | "low" };
 type Conditions = {
+  scoreNote?: string;
   weatherPreview?: boolean;
   tidePreview?: boolean;
   tideRetrievedAt?: string;
@@ -29,12 +31,12 @@ type Conditions = {
   correctionQuality?: "local" | "nearby" | "coordinate" | "direct" | "unsupported";
   confidence?: { level: "높음" | "보통" | "낮음"; officialSources: number; tideBasis: string; reasons: string[] };
   date: string;
-  rating: "최상" | "좋음" | "중간" | "나쁨";
+  rating: ScoreRating;
   score: number;
   summary: string;
   bestWindow: string;
   recommendedWindows: Array<{ lowTime: string; lowHeight: number; start: string; end: string; startDayOffset?: number; endDayOffset?: number; period: "낮" | "밤" }>;
-  weather: { forecastTimes?: string[]; representativeTime?: string; issuedAt?: string | null; rainUsesCategoryBounds?: boolean; missingWindowTimes?: string[]; coverageNote?: string; temperature: number; wind: number; rain: number; rainDayTotal?: number | null; sky: string; waveHeight: number | null; rainProbability: number; rainDayProbability?: number; humidity: number; basis?: "OUTING_WINDOWS" | "DAY"; focusTimes?: string[]; kind?: "forecast" | "observation" };
+  weather: { windBasis?: "daily-mean" | "daily-maximum" | "hourly-maximum"; windObservationHours?: number; windSourceUrl?: string; observationStation?: string; observationSourceUrl?: string; forecastTimes?: string[]; representativeTime?: string; issuedAt?: string | null; rainUsesCategoryBounds?: boolean; missingWindowTimes?: string[]; coverageNote?: string; temperature: number; wind: number; rain: number; rainDayTotal?: number | null; sky: string; waveHeight: number | null; rainProbability: number; rainDayProbability?: number; humidity: number; basis?: "OUTING_WINDOWS" | "DAY"; focusTimes?: string[]; kind?: "forecast" | "observation" };
   recentRain?: {
     last24h: number | null;
     last48h: number | null;
@@ -108,10 +110,10 @@ const CAMPS = [
 ];
 
 const ratingClass: Record<Conditions["rating"], string> = {
-  최상: "best",
+  "당장 가야 함": "best",
   좋음: "good",
-  중간: "middle",
-  나쁨: "bad",
+  보통: "middle",
+  비추: "bad",
 };
 
 const RECOMMEND_CANDIDATES = [
@@ -207,41 +209,6 @@ const SPECIES_RANK_CANDIDATES: Record<RankSpecies, string[]> = {
   백합: ["mongsanpo", "cheongpodae", "gomsom", "mageompo", "muchangpo", "doksan", "chunjangdae", "seondori", "dangampo", "jinsanri", "biin", "byeonsan", "baekmiri", "mokpo"],
 };
 
-const FIELD_REPORT_BONUS: Partial<Record<RankSpecies, Record<string, number>>> = {
-  낙지: { hwangdo: 7, ganwoldo: 6, waemok: 5, gomsom: 5, garorim: 5 },
-  소라: { padory: 7, hakampo: 6, guryepo: 6, gareumi: 5, somuui: 5 },
-  광어: { waemok: 10 },
-  우럭: { sinjindo: 7, anheung: 7, padory: 5, somuui: 5 },
-  꽃게: { mongsanpo: 7, ganwoldo: 5, muchangpo: 5 },
-  대하: { mongsanpo: 6, ganwoldo: 6, garorim: 5, muchangpo: 5 },
-  새우: {},
-  골뱅이: { padory: 6, hakampo: 5, guryepo: 5, somuui: 4 },
-  농어: { mongsanpo: 9, waemok: 5, anheung: 5, sinjindo: 5 },
-  숭어: { mongsanpo: 9, ganwoldo: 5, garorim: 5 },
-  해삼: { padory: 6, hakampo: 5, gareumi: 5, somuui: 4 },
-  맛조개: {},
-  동죽: {},
-  바지락: { ganwoldo: 7, jungri: 6, seondori: 5, baekmiri: 5 },
-  백합: { mongsanpo: 6, cheongpodae: 5, seondori: 5, mokpo: 5 },
-};
-
-const AQUACULTURE_ECOLOGY_BONUS: Partial<Record<RankSpecies, Record<string, number>>> = {
-  광어: { waemok: 10, sinjindo: 5, anheung: 5 },
-  우럭: { waemok: 10, sinjindo: 6, anheung: 6 },
-};
-
-const SPECIES_EVIDENCE: Partial<Record<RankSpecies, Record<string, string>>> = {
-  광어: { waemok: "근거 A · 키릭의 왜목마을 광어 다수 직접관찰" },
-  맛조개: {
-    mongsanpo: "근거 C · 넓은 모래갯벌 지형 후보, 확인 가능한 조과글 추가 필요", doksan: "근거 C · 넓은 모래갯벌 지형 후보, 현장 채취허용 확인 필요",
-    chunjangdae: "근거 C · 모래갯벌 지형 후보, 확인 가능한 조과글 추가 필요", muchangpo: "근거 C · 모래갯벌 지형 후보, 실제 조과 미확인",
-  },
-  동죽: {
-    seonjaedo_eochon: "근거 B · 어촌체험마을 권역, 동죽 운영 여부는 방문 전 확인", jeburi_eochon: "근거 B · 어촌체험마을 권역, 동죽 운영 여부는 방문 전 확인",
-    baekmiri: "근거 B · 어촌체험마을 권역, 채취종목·운영일 확인", jungri: "근거 B · 어촌체험마을 권역, 채취종목·운영일 확인", seondori: "근거 B · 갯벌체험장 권역, 동죽 채취 가능 여부 확인",
-  },
-};
-
 function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const rad = (v: number) => v * Math.PI / 180;
   const dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
@@ -299,12 +266,8 @@ function speciesRankScore(species: RankSpecies, spot: typeof SPOTS[number], data
 
   const visibility = getWaterVisibility(data, spot.terrain);
   const visibilityPoints = getVisibilityAdjustment(visibility.level) ?? 0;
-  const fieldBonus = FIELD_REPORT_BONUS[species]?.[spot.id] ?? 0;
-  const aquacultureBonus = AQUACULTURE_ECOLOGY_BONUS[species]?.[spot.id] ?? 0;
-  const evidence = SPECIES_EVIDENCE[species]?.[spot.id]
-    ?? (aquacultureBonus ? "근거 B · 양식활동 연안권 보조정보, 실제 조과는 추가 확인 필요" : "근거 C · 지형·물때 후보, 검증 가능한 현장 조과 제보 없음");
-  const evidencePoints = evidence.startsWith("근거 A") ? 5 : evidence.startsWith("근거 B") ? 2 : 0;
-  const reportPoints = Math.max(evidencePoints, clamp((fieldBonus + aquacultureBonus) * .5, 0, 5));
+  const reportPoints = 0;
+  const evidence = "조과 기록 탭에서 원문 확인 · 표본 부족으로 조과 가산 없음";
 
   const score = Math.round(clamp(habitatPoints + tidePoints + timingPoints + seasonPoints + visibilityPoints + reportPoints, 0, 98.9) * 10) / 10;
   const reasons = [
@@ -314,13 +277,11 @@ function speciesRankScore(species: RankSpecies, spot: typeof SPOTS[number], data
     `${timeGuide.icon} ${timeGuide.label}·${matchingLow ? "맞는 시간대 간조 있음" : "맞는 시간대 간조 없음"}·수중시야 ${visibility.level} → 시간 ${timingPoints}/15, 물색 ${signedPoints(visibilityPoints)}`,
     `${month}월 계절점수 ${seasonPoints}/15점: ${season.text}`,
   ];
-  if (fieldBonus) reasons.push(`공개 현장 경험 가산 ${Math.min(5, fieldBonus * .5).toFixed(1)}점`);
-  if (aquacultureBonus) reasons.push(`양식활동 연안권 보조 가산 포함(출입·채취 허용 의미 아님)`);
   return { score, reasons };
 }
 
 function top5Rating(score: number): Conditions["rating"] {
-  return score >= 85 ? "최상" : score >= 72 ? "좋음" : score >= 55 ? "중간" : "나쁨";
+  return getScoreRating(score);
 }
 
 function isoDate(d: Date) {
@@ -436,8 +397,8 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
       else if (profile.good.includes(month)) { score += 4; reasons.push(`${month}월은 ${item.name} 활동을 기대할 수 있어요. ${profile.text}`); }
       else { score -= 7; reasons.push(`${month}월은 ${item.name}의 중심 시기에서 벗어나 계절 감점을 적용했어요.`); }
     }
-    if (location === "waemok" && (item.name === "광어" || item.name === "우럭")) { score += 10; reasons.push("왜목마을에서 실제 광어·우럭을 다수 관찰한 사용자 현장기록을 반영했어요."); }
-    if (location === "mongsanpo" && ["꽃게", "농어", "숭어"].includes(item.name)) { score += 9; reasons.push("몽산포에서 꽃게와 농어·숭어류를 관찰한 사용자 현장기록을 반영했어요."); }
+    if (location === "waemok" && (item.name === "광어" || item.name === "우럭")) reasons.push("운영자 관찰 메모가 있으나 일자·원문 미등록으로 조과 가산은 보류했어요.");
+    if (location === "mongsanpo" && ["꽃게", "농어", "숭어"].includes(item.name)) reasons.push("운영자 관찰 메모가 있으나 일자·원문 미등록으로 조과 가산은 보류했어요.");
     if (tideRange !== null) {
       if (tideAdjustment !== null && tideAdjustment > 0 && tideRange >= 350) { score += 8; reasons.push(`오늘 조차가 약 ${Math.round(tideRange)}cm로 커서 간조 노출 면적을 기대할 수 있어요.`); }
       else if (tideRange < 180) { score -= 7; reasons.push(`오늘 조차가 약 ${Math.round(tideRange)}cm로 작아 노출 면적이 제한될 수 있어요.`); }
@@ -458,7 +419,7 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
       if (!data.sourceStatus.weather) reasons.push("이 날짜는 단기 날씨 발표 범위 밖이라 물때·지형 중심으로 계산했어요.");
     }
     score = Math.max(10, Math.min(95, Math.round(score)));
-    const grade = score >= 80 ? "기대 높음" : score >= 65 ? "좋음" : score >= 45 ? "보통" : "기대 낮음";
+    const grade = getScoreRating(score);
     return { ...item, timeGuide, score, grade, reasons: reasons.slice(0, 4) };
   });
   const rankedRows = [...scoredRows].sort((a, b) => Number(a.closed) - Number(b.closed) || b.score - a.score || a.name.localeCompare(b.name, "ko"));
@@ -649,7 +610,7 @@ function getMetricExplanation(metric: DetailMetric, data: Conditions | null, ter
 }
 
 function activityRating(score: number): Conditions["rating"] {
-  return score >= 85 ? "최상" : score >= 70 ? "좋음" : score >= 45 ? "중간" : "나쁨";
+  return getScoreRating(score);
 }
 
 function getActivityRatings(data: Conditions | null) {
@@ -714,7 +675,7 @@ export default function Home() {
   const [speciesRankings, setSpeciesRankings] = useState<Array<{ id: string; data: Conditions; score: number; reasons: string[] }>>([]);
   const [speciesRankStatus, setSpeciesRankStatus] = useState<"idle" | "loading" | "error">("idle");
   const [showAllSpecies, setShowAllSpecies] = useState(false);
-  const [tab, setTab] = useState<"overview" | "species" | "camping" | "map">("overview");
+  const [tab, setTab] = useState<"overview" | "species" | "history" | "camping" | "map">("overview");
   const [showDataGuide, setShowDataGuide] = useState(false);
   const [shareNotice, setShareNotice] = useState("");
   const [detailMetric, setDetailMetric] = useState<DetailMetric | null>(null);
@@ -731,7 +692,8 @@ export default function Home() {
   const dataGuideSheetRef = useRef<HTMLElement>(null);
   const dataGuideWasOpen = useRef(false);
   const spot = SPOTS.find((item) => item.id === spotId) ?? SPOTS[0];
-  const { data, loading, savedTide, error: conditionsError } = useConditions<Conditions>(spot.source, date);
+  const { data, loading, savedTide, scoreHistory, error: conditionsError } = useConditions<Conditions>(spot.source, date);
+  const previousScore = scoreHistory.observation ?? scoreHistory.forecast;
   const hasOverallScore = !loading && Boolean(data?.sourceStatus.tide && data.sourceStatus.weather) && Number.isFinite(data?.score);
   const startupTide = data?.sourceStatus.tide ? data : savedTide;
   const showingSavedTide = Boolean(startupTide && !data?.sourceStatus.tide);
@@ -961,8 +923,11 @@ export default function Home() {
           </div>
           <div className="hero-overall-score" aria-label="해루질 종합점수" aria-live="polite">
             <div className="hero-score-label"><b>해루질 종합점수</b><small>100점 만점 · 참고용 · 안전 보장 아님</small></div>
-            <div className="hero-score-value">{hasOverallScore && data ? <><strong>{data.score}<small>점</small></strong><span>{data.rating}</span></> : <span>{loading ? "확인 중" : "자료 부족"}</span>}</div>
+            <div className="hero-score-value">{hasOverallScore && data ? <><strong>{data.score}<small>점</small></strong><span>{data.rating}</span></> : previousScore ? <><strong>{previousScore.score}<small>점</small></strong><span>{previousScore.rating}</span></> : <span>{loading ? "확인 중" : "계산 자료 대기"}</span>}</div>
           </div>
+          {(data?.scoreNote && hasOverallScore) && <p className="score-history-note">{data.scoreNote}</p>}
+          {previousScore && !hasOverallScore && <p className="score-history-note">이전에 확인한 {previousScore.kind === "observation" ? "관측 참고" : "예보"} 점수 · {new Date(previousScore.checkedAt).toLocaleString("ko-KR", {timeZone:"Asia/Seoul"})} 기록 · {loading ? "새 자료 확인 중" : "새 조회 실패로 이전 기록 표시"}</p>}
+          {date < today && scoreHistory.forecast && hasOverallScore && data?.weather.kind === "observation" && <p className="score-history-note">당시 확인한 예보: {scoreHistory.forecast.score}점 · {scoreHistory.forecast.rating} / 위 점수는 실제 관측으로 다시 계산한 값입니다.</p>}
           <p className="startup-tide-status">{showingSavedTide ? (loading ? "저장된 물때 · 최신 자료 확인 중" : "저장된 물때 · 최신 확인 실패") : data?.tidePreview ? "인근 기준항 먼저 표시 · 선택지점 자료 확인 중" : startupTide ? "확인된 조석예보" : "처음 조회한 자료는 다음 실행부터 바로 표시합니다."}{startupTide?.tideRetrievedAt && <> · 조회 {new Date(startupTide.tideRetrievedAt).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" })}</>}</p>
           <div className="source-line"><span>⚓ 기준 {displayedTideBasis}</span><span>{startupTide?.tideMethod === "nearby" ? "인근 기준점 참고 · 현지와 차이 있음" : "예측값 · 실시간 현장 수위 아님"}</span></div>
 
@@ -1024,6 +989,7 @@ export default function Home() {
       <nav className="tabs" aria-label="정보 구분" role="tablist">
         <button role="tab" aria-selected={tab === "overview"} className={tab === "overview" ? "active" : ""} onClick={() => setTab("overview")}>출조</button>
         <button role="tab" aria-selected={tab === "species"} className={tab === "species" ? "active" : ""} onClick={() => setTab("species")}>대상어종</button>
+        <button role="tab" aria-selected={tab === "history"} className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>조과 기록</button>
         <button role="tab" aria-selected={tab === "camping"} className={tab === "camping" ? "active" : ""} onClick={() => setTab("camping")}>캠핑</button>
         <button role="tab" aria-selected={tab === "map"} className={tab === "map" ? "active" : ""} onClick={() => setTab("map")}>지도·편의</button>
       </nav>
@@ -1032,9 +998,10 @@ export default function Home() {
         <div className="content-stack overview-flow">
           <section className="section-card forecast-card overview-step">
             <div className="overview-step-head"><span>1</span><div><small>먼저 확인</small><h2>선택 날짜 자세히</h2></div><b>{formatDay(date)}</b></div>
+            {data?.weather.kind === "observation" && data.weather.observationSourceUrl && <a className="observation-source" href={data.weather.observationSourceUrl} target="_blank" rel="noopener noreferrer">기상청 과거 관측 원문 보기 ↗</a>}
             {data?.tidePreview && <p className="accuracy-note">인근 기준항 물때 먼저 표시 · 선택지점 좌표형 자료 확인 중입니다. 확인 결과에 따라 물때와 날씨 시간대가 갱신될 수 있어요.</p>}
             {data?.tideRetrievedAt && <p className="accuracy-note">물때 원자료 조회 {new Date(data.tideRetrievedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} (한국시간)</p>}
-            {data?.sourceStatus.weather ? <div className={`weather-mode-label ${data.weather.kind === "observation" ? "observed" : "forecast"}`}><b>{data.weather.kind === "observation" ? "과거 실제 관측으로 재계산" : data.weatherPreview ? "선택 날짜 예보 · 물때 확인 중" : data.weather.basis === "DAY" ? "선택 날짜 제공 예보" : "확인된 시간대 예보"}</b><span>{data.weather.kind === "observation" ? "당시 예보 아님 · 실제 관측 재계산" : `예보 시각 ${(data.weather.forecastTimes ?? []).join(" · ") || "범위 확인 필요"} (한국시간)`}</span></div> : <div className="weather-unavailable-card"><span>☁️</span><div><b>{loading ? "공식 날씨 조회 중" : "공식 날씨 미확인"}</b><p>{conditionsError || data?.sourceErrors?.weather || "선택 날짜·시간의 날씨가 미제공되었거나 조회 중입니다."}</p></div></div>}
+            {data?.sourceStatus.weather ? <div className={`weather-mode-label ${data.weather.kind === "observation" ? "observed" : "forecast"}`}><b>{data.weather.kind === "observation" ? "과거 관측 참고 점수" : data.weatherPreview ? "선택 날짜 예보 · 물때 확인 중" : data.weather.basis === "DAY" ? "선택 날짜 제공 예보" : "확인된 시간대 예보"}</b><span>{data.weather.kind === "observation" ? `${data.weather.observationStation ?? "기상청 관측"} · ${data.weather.windBasis === "hourly-maximum" ? `관측 ${data.weather.windObservationHours}/24시간 중 최대 풍속` : data.weather.windBasis === "daily-mean" ? "하루 평균 풍속" : "하루 최대 풍속"}` : `예보 시각 ${(data.weather.forecastTimes ?? []).join(" · ") || "범위 확인 필요"} (한국시간)`}</span></div> : <div className="weather-unavailable-card"><span>☁️</span><div><b>{loading ? "공식 날씨 조회 중" : "공식 날씨 미확인"}</b><p>{conditionsError || data?.sourceErrors?.weather || "선택 날짜·시간의 날씨가 미제공되었거나 조회 중입니다."}</p></div></div>}
             {data && <div className="accuracy-note" role="note">
               <b>물때 기준: {data.tideSource?.stationName ?? data.referencePort}</b>
               <p>{data.tideMethod === "nearby" ? "선택 해변의 현지 물높이가 아닌 인근 기준점 예보입니다. 간조 시각·높이는 현장과 다를 수 있어요." : data.tideSource?.correctionMethod}</p>
@@ -1047,7 +1014,7 @@ export default function Home() {
             <div className="selected-day-detail" aria-live="polite">
               <div className="selected-day-title">
                 <span>참고지수 · 안전 보장 아님</span>
-                <strong>{(!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? data.rating : "자료 부족")} {!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? `${data.score}점` : ""}</strong>
+                <strong>{(!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? data.rating : "계산 자료 대기")} {!loading && data?.sourceStatus.tide && data.sourceStatus.weather ? `${data.score}점` : ""}</strong>
               </div>
               <p>{loading ? "도착한 자료부터 표시합니다. 참고지수는 전체 자료 확인 후 표시해요." : conditionsError || data?.summary || "상세 자료를 불러오는 중이에요."}</p>
               <p className="metric-tap-hint">👇 궁금한 숫자를 누르면 실제 체감과 물 상태를 설명해요.</p>
@@ -1111,10 +1078,13 @@ export default function Home() {
         </section>
       </>}
 
+      {tab === "history" && <CatchHistory spotId={spot.id} spotName={spot.name} />}
+
       {tab === "species" && (
         <div className="content-stack">
           <section className="section-card local-species-card">
             <div className="section-title-row"><h2>{spot.name} 추천 생물 순위</h2><span>{formatDay(date)} · 점수순</span></div>
+            <p className="catch-help">지형·계절 가정으로 계산한 참고 순위입니다. 실제로 잡은 기록은 <button className="catch-inline-link" type="button" onClick={() => setTab("history")}>조과 기록</button>에서 출처와 함께 확인하세요.</p>
             <div className="species-time-legend" aria-label="대상어종 추천 시간 범례">
               <span className="time-badge time-day">☀️ 낮 채취</span>
               <span className="time-badge time-night">🌙 야간 활동</span>
@@ -1124,7 +1094,7 @@ export default function Home() {
             <div className="species-list">
               {species.rows.slice(0, showAllSpecies ? species.rows.length : 5).map((item, index) => {
                 const timeClass = item.timeGuide.preference === "day" ? "time-day" : item.timeGuide.preference === "night" ? "time-night" : "time-either";
-                const scoreClass = item.closed ? "closed-score" : item.score >= 80 ? "high" : item.score >= 65 ? "good" : item.score >= 45 ? "mid" : "low";
+                const scoreClass = item.closed ? "closed-score" : item.score >= 85 ? "high" : item.score >= 70 ? "good" : item.score >= 50 ? "mid" : "low";
                 return <details key={item.name} className={`species-item ${item.closed ? "closed" : "open"}`}>
                   <summary>
                     <span className="species-leading"><b className={item.closed ? "closed-position" : ""}>{item.closed ? "제외" : `${index + 1}위`}</b><span className="species-icon"><SpeciesIcon name={item.name} /></span></span>
@@ -1148,7 +1118,7 @@ export default function Home() {
             <p className="species-rank-intro">노릴 생물을 고른 다음, 그 생물의 조건이 좋은 장소를 비교해 보세요.</p>
             <label className="rank-species-select"><span>대상어종 선택</span><span className="rank-species-input"><span className="rank-selected-icon"><SpeciesIcon name={rankSpecies} /></span><select value={rankSpecies} onChange={(event) => chooseRankSpecies(event.target.value as RankSpecies)}>{RANK_SPECIES.map(item => <option key={item} value={item}>{item}</option>)}</select></span></label>
             <p className={`rank-time-guide ${getSpeciesTimeGuide(rankSpecies).preference === "day" ? "time-day" : getSpeciesTimeGuide(rankSpecies).preference === "night" ? "time-night" : "time-either"}`}><b>{getSpeciesTimeGuide(rankSpecies).icon} {getSpeciesTimeGuide(rankSpecies).label}</b>{getSpeciesTimeGuide(rankSpecies).note}</p>
-            <p className="season-guide"><b>{rankSpecies} 계절 정보</b>{SPECIES_SEASON[rankSpecies].text}</p>
+            <p className="season-guide"><b>{rankSpecies} 계절 가정 · 조과 통계 아님</b>{SPECIES_SEASON[rankSpecies].text}</p>
             <button className="rank-load-button" onClick={() => loadSpeciesRankings(rankSpecies, date)} disabled={speciesRankStatus === "loading"}>{speciesRankStatus === "loading" ? `${rankSpecies} 순위 계산 중…` : `${rankSpecies} 좋은 지역 TOP 5 보기`}</button>
             {speciesRankStatus === "error" && <p className="rank-error">자료를 일부 불러오지 못했어요. 잠시 후 다시 눌러 주세요.</p>}
             {speciesRankings.length > 0 && <div className="species-rank-list">
@@ -1162,7 +1132,7 @@ export default function Home() {
                 </button>;
               })}
             </div>}
-            <p className="rank-method"><b>근거등급</b> A 직접관찰·확인자료 / B 체험어장·양식권 등 간접자료 / C 지형·물때 후보(조과 미확인). 공식 물때·날씨를 우선 반영하며, 양식장·마을어장은 허가 없이 들어가거나 채취하면 안 됩니다.</p>
+            <p className="rank-method"><b>추천과 조과의 차이</b> 이 순위는 지형·물때·날씨·계절 가정을 이용한 참고 점수입니다. 실제 조과 확률이 아니며, 출처 없는 현장 경험과 양식권 가산은 적용하지 않습니다. 날짜와 출처가 있는 후기는 조과 기록 탭에서 확인하세요.</p>
           </section>
         </div>
       )}
@@ -1253,12 +1223,12 @@ export default function Home() {
           </section>
           <section className="section-card score-card">
             <h2>4단계 판단 기준</h2>
-            <div><b className="best">최상</b><p>물때·물색·날씨를 합산해 85점 이상</p></div>
-            <div><b className="good">좋음</b><p>대체로 적합하지만 현장 확인이 필요한 날</p></div>
-            <div><b className="middle">중간</b><p>노출 시간이나 날씨 중 하나가 아쉬운 날</p></div>
-            <div><b className="bad">나쁨</b><p>강풍·강수 또는 물때가 맞지 않아 권하지 않는 날</p></div>
+            <div><b className="best">당장 가야 함</b><p>85점 이상~100점</p></div>
+            <div><b className="good">좋음</b><p>70점 이상~85점 미만</p></div>
+            <div><b className="middle">보통</b><p>50점 이상~70점 미만</p></div>
+            <div><b className="bad">비추</b><p>0점 이상~50점 미만</p></div>
             <p className="formula-note">{SCORE_POLICY_DESCRIPTION}</p>
-            <p className="formula-note">바람 10m/s 이상 또는 강한 비가 예상되면 물때 점수와 관계없이 ‘나쁨’으로 제한합니다.</p>
+            <p className="formula-note">바람 10m/s 이상 또는 강한 비가 예상되면 물때 점수와 관계없이 ‘비추’로 제한합니다.</p>
           </section>
           <div className="danger-box"><strong>해루질 지수는 안전을 보장하지 않아요.</strong><p>출발 전 기상특보와 현장 통제 여부를 다시 확인하고, 반드시 2인 이상 활동하며 들물 전에 철수하세요.</p></div>
           <button className="data-guide-done" type="button" onClick={() => setShowDataGuide(false)}>확인</button>

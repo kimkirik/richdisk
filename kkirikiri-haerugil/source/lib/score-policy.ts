@@ -21,3 +21,9 @@ export function signedPoints(value: number | null | undefined) {
 }
 
 export const SCORE_POLICY_DESCRIPTION = "기본 60점 + 날씨 최대 25점. 4·5·6물 +15점, 9물·조금 −15점, 나머지 물때는 0점. 물색은 약간 흐림 −10점, 많이 흐림 −20점, 커피물 가능성 큼 −30점. 최종 점수는 0~100점입니다.";
+
+export type ScoreRating = "비추" | "보통" | "좋음" | "당장 가야 함";
+/** Lower-inclusive bands: 50, 70 and 85 belong to the next band. */
+export function getScoreRating(score: number): ScoreRating {
+  return score >= 85 ? "당장 가야 함" : score >= 70 ? "좋음" : score >= 50 ? "보통" : "비추";
+}
