@@ -1,0 +1,702 @@
+diff --git a/app/api/conditions/route.ts b/app/api/conditions/route.ts
+index 4d5b780..6822bb9 100644
+--- a/app/api/conditions/route.ts
++++ b/app/api/conditions/route.ts
+@@ -3,6 +3,10 @@ import { finiteNumber, summarizeForecast, toKmaGrid } from "../../../lib/conditi
+ import { TIDE_POINT_ASSIGNMENTS } from "../../../lib/tide-points";
+ import { createAsyncCache } from "../../../lib/async-cache";
+ import { progressiveResponse } from "../../../lib/progressive-response";
++import { getMulTtae } from "../../../lib/tide-calendar";
++import { SPOTS } from "../../../lib/spots";
++import { getWaterVisibility } from "../../../lib/water-visibility";
++import { getTideAdjustment, getVisibilityAdjustment } from "../../../lib/score-policy";
+ 
+ type ConditionsPayload = { live: boolean; sourceStatus: { tide: boolean; weather: boolean; recentRain: boolean; recentRainOfficial: boolean }; [key: string]: unknown };
+ const conditionsCache = createAsyncCache<ConditionsPayload>(300);
+@@ -920,17 +924,17 @@ async function getBestTides(key: string, location: Location, date: string, allow
+   return stationPromise;
+ }
+ 
+-function scoreConditions(tides: Tide[], weather: Weather | null, recentRain: RecentRain | null) {
+-  if (!tides.length) return { score: 0, rating: "나쁨" as const, bestWindow: "", recommendedWindows: [], summary: "공식 물때 자료를 확인하지 못했어요", scoreBreakdown: { tide: 0, weather: 0, visibility: 0 }, riskFlags: ["공식 물때 자료 대기"] };
+-  const heights = tides.map((tide) => tide.height);
+-  const range = Math.max(...heights) - Math.min(...heights);
+-  let tideScore = 20;
+-  if (range >= 450) tideScore += 25; else if (range >= 300) tideScore += 16; else tideScore += 7;
+-  const lowest = Math.min(...heights);
+-  if (lowest <= 100) tideScore += 15; else if (lowest <= 160) tideScore += 9;
+-  tideScore = Math.min(60, tideScore);
++function scoreConditions(tides: Tide[], weather: Weather | null, recentRain: RecentRain | null, date: string, terrain: string) {
++  if (!tides.length) return { score: 0, rating: "나쁨" as const, bestWindow: "", recommendedWindows: [], summary: "공식 물때 자료를 확인하지 못했어요", scoreBreakdown: { base: 0, tide: 0, weather: 0, visibility: null }, riskFlags: ["공식 물때 자료 대기"] };
++  const baseScore = 60;
++  const mulTtae = getMulTtae(date);
++  const tideScore = getTideAdjustment(mulTtae) ?? 0;
+   let weatherScore = weather ? 25 : 0;
+-  let visibilityScore = recentRain ? 15 : 7;
++  const waterVisibility = getWaterVisibility(weather ? {
++    sourceStatus: { weather: true, recentRain: Boolean(recentRain) },
++    weather, recentRain, tides,
++  } : null, terrain);
++  const visibilityScore = getVisibilityAdjustment(waterVisibility.level);
+   const riskFlags: string[] = [];
+   if (weather) {
+     if (weather.wind >= 10) { weatherScore -= 22; riskFlags.push("강풍 위험"); }
+@@ -941,17 +945,10 @@ function scoreConditions(tides: Tide[], weather: Weather | null, recentRain: Rec
+     if (weather.waveHeight !== null && weather.waveHeight >= 1.5) { weatherScore -= 15; riskFlags.push("높은 파고"); }
+     else if (weather.waveHeight !== null && weather.waveHeight >= .8) weatherScore -= 6;
+   }
+-  if (recentRain) {
+-    if (recentRain.last72h !== null && recentRain.last72h >= 50) { visibilityScore -= 14; riskFlags.push("최근 3일 폭우 영향"); }
+-    else if (recentRain.last72h !== null && recentRain.last72h >= 30) visibilityScore -= 10;
+-    else if (recentRain.last48h !== null && recentRain.last48h >= 15) visibilityScore -= 7;
+-    else if (recentRain.last24h !== null && recentRain.last24h >= 5) visibilityScore -= 4;
+-    else if (recentRain.last24h !== null && recentRain.last24h > 0) visibilityScore -= 2;
+-    if (recentRain.consecutiveRainDays >= 2) visibilityScore -= 3;
+-  }
++  if (recentRain?.last72h !== null && (recentRain?.last72h ?? 0) >= 50) riskFlags.push("최근 3일 폭우 영향");
++  if (visibilityScore !== null && visibilityScore < 0) riskFlags.push(`${waterVisibility.level} · 물색 ${visibilityScore}점`);
+   weatherScore = Math.max(0, weatherScore);
+-  visibilityScore = Math.max(0, visibilityScore);
+-  let score = tideScore + weatherScore + visibilityScore;
++  let score = baseScore + tideScore + weatherScore + (visibilityScore ?? 0);
+   score = Math.max(0, Math.min(100, Math.round(score)));
+   if (riskFlags.some(flag => ["강풍 위험", "강한 비", "높은 파고"].includes(flag))) score = Math.min(score, 34);
+   const rating = score >= 85 ? "최상" : score >= 70 ? "좋음" : score >= 45 ? "중간" : "나쁨";
+@@ -971,8 +968,8 @@ function scoreConditions(tides: Tide[], weather: Weather | null, recentRain: Rec
+     };
+   });
+   const bestWindow = recommendedWindows.map(window => `${window.start} ~ ${window.end}`).join(" · ");
+-  const summary = !weather ? `물때 기준 ${rating} · 날씨는 아직 반영되지 않았어요` : rating === "최상" ? "물 빠짐과 날씨가 모두 좋아요" : rating === "좋음" ? "해루질하기 무난한 조건이에요" : rating === "중간" ? "현장 바람과 물 흐름을 확인하세요" : "오늘은 해루질을 권하지 않아요";
+-  return { score, rating, bestWindow, recommendedWindows, summary, scoreBreakdown: { tide: tideScore, weather: weatherScore, visibility: visibilityScore }, riskFlags };
++  const summary = !weather ? `물때 기준 ${rating} · 날씨는 아직 반영되지 않았어요` : rating === "최상" ? "선호 물때와 날씨 조건이 좋아요" : rating === "좋음" ? "해루질하기 무난한 조건이에요" : rating === "중간" ? "현장 바람과 물 흐름을 확인하세요" : "오늘은 해루질을 권하지 않아요";
++  return { score, rating, bestWindow, recommendedWindows, summary, mulTtae, waterVisibility, scoreBreakdown: { base: baseScore, tide: tideScore, weather: weatherScore, visibility: visibilityScore }, riskFlags };
+ }
+ 
+ export async function GET(request: NextRequest) {
+@@ -1067,7 +1064,7 @@ async function loadConditions(locationId: string, location: Location, date: stri
+   return snapshot();
+ 
+   function snapshot(): ConditionsPayload {
+-  const scored = scoreConditions(tides, weatherLive ? weather : null, recentRainLive ? recentRain : null);
++  const scored = scoreConditions(tides, weatherLive ? weather : null, recentRainLive ? recentRain : null, date, SPOTS.find(spot => spot.source === locationId)?.terrain ?? "");
+   const recentRainOfficial = Boolean(recentRainLive && recentRain?.official);
+   const confidenceScore = [tideLive, weatherLive, recentRainOfficial].filter(Boolean).length;
+   // TideBED 파서는 공식 스키마 fixture를 통과하지만 현장 오차 backtest 전에는 신뢰도를 '보통'으로 제한한다.
+diff --git a/app/globals.css b/app/globals.css
+index ac65c04..918d259 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -163,7 +163,7 @@ body { background: linear-gradient(180deg,#bfe8ee 0,#e8f5f4 38%,#d9eee9 100%); f
+ .decision-card { border-color: #b9ddd9; background: linear-gradient(145deg,#ffffff,#edf9f6); }
+ .decision-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.decision-title small { color: var(--muted); font-size: 11px; font-weight: 800; }.decision-title h2,.decision-title h3 { margin: 3px 0 0; font-size: 22px; }.decision-title > b { padding: 8px 10px; border-radius: 11px; color: white; font-size: 11px; }.confidence-높음 { background: #218b70; }.confidence-보통 { background: #597f91; }.confidence-낮음 { background: #bf735c; }.confidence-loading { background: #7c9398; }
+ .risk-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }.risk-flags span { padding: 7px 9px; border-radius: 999px; background: #fff0dd; color: #88501d; font-size: 10px; font-weight: 800; }
+-.score-breakdown { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-top: 12px; }.score-breakdown span { padding: 10px 6px; border-radius: 12px; background: white; color: var(--muted); font-size: 10px; text-align: center; }.score-breakdown b { display: block; margin-top: 4px; color: var(--deep); font-size: 14px; }.decision-card ul { margin: 12px 0 0; padding-left: 18px; color: #536d6c; font-size: 11px; line-height: 1.65; }
++.score-breakdown { display: grid; grid-template-columns: repeat(2,1fr); gap: 7px; margin-top: 12px; }.score-breakdown span { padding: 10px 6px; border-radius: 12px; background: white; color: var(--muted); font-size: 10px; text-align: center; }.score-breakdown b { display: block; margin-top: 4px; color: var(--deep); font-size: 14px; }.decision-card ul { margin: 12px 0 0; padding-left: 18px; color: #536d6c; font-size: 11px; line-height: 1.65; }
+ .map-hub-card > p { margin: 8px 0 14px; color: var(--muted); font-size: 11px; line-height: 1.6; }.primary-map-link { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; padding: 13px; border-radius: 15px; color: white; background: linear-gradient(135deg,#079c9c,#08768b); text-decoration: none; }.primary-map-link > span { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: rgba(255,255,255,.16); font-size: 22px; }.primary-map-link div { display: flex; flex-direction: column; gap: 3px; }.primary-map-link strong { font-size: 13px; }.primary-map-link small { color: #d9fbf5; font-size: 10px; }.primary-map-link > b { font-size: 11px; }
+ .facility-search-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 10px; }.facility-search-grid a { min-height: 96px; padding: 12px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #d6e8e6; border-radius: 14px; color: var(--ink); background: #f8fcfb; text-decoration: none; }.facility-search-grid a > span { font-size: 22px; }.facility-search-grid strong { margin-top: 3px; font-size: 13px; }.facility-search-grid small { color: var(--muted); font-size: 10px; }
+ .nearby-spot-card > div:last-child { display: grid; grid-template-columns: repeat(2,1fr); gap: 7px; margin-top: 12px; }.nearby-spot-card button { min-width: 0; padding: 11px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #d8e8e7; border-radius: 12px; color: var(--ink); background: #f9fcfb; text-align: left; }.nearby-spot-card button.selected { border-color: var(--sea); background: #e6f7f5; }.nearby-spot-card strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.nearby-spot-card small { color: var(--muted); font-size: 9px; }
+diff --git a/app/page.tsx b/app/page.tsx
+index e33c3cf..9c45752 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -5,6 +5,9 @@ import Link from "next/link";
+ import { useConditions, useKstToday } from "../lib/use-conditions";
+ import { createComparisonCache, mapConcurrent } from "../lib/conditions-client";
+ import { getMulTtae } from "../lib/tide-calendar";
++import { SPOTS } from "../lib/spots";
++import { getWaterVisibility } from "../lib/water-visibility";
++import { getTideAdjustment, getVisibilityAdjustment, signedPoints, SCORE_POLICY_DESCRIPTION } from "../lib/score-policy";
+ import { explainRain, explainWave, explainWind } from "../lib/weather-feel";
+ import { tidePointFor } from "../lib/tide-points";
+ import { PwaInstallButton } from "./pwa-install-button";
+@@ -44,7 +47,8 @@ type Conditions = {
+     days?: Array<{ date: string; amount: number | null; kmaAmount: number | null; gridAmount: number | null; basis: "KMA_ASOS" | "OPEN_METEO_GRID" | "KMA_ASOS_AND_GRID" | "UNAVAILABLE" }>;
+     note?: string;
+   } | null;
+-  scoreBreakdown?: { tide: number; weather: number; visibility: number };
++  scoreBreakdown?: { base?: number; tide: number; weather: number; visibility: number | null };
++  mulTtae?: string;
+   riskFlags?: string[];
+   tides: Tide[];
+   updatedAt: string;
+@@ -84,93 +88,7 @@ const REGIONS = [
+   { id: "honam", name: "군산·부안·목포" },
+ ];
+ 
+-const SPOTS = [
+-  { id: "gujina", name: "꾸지나무골 해수욕장", region: "taean", source: "gujina", sourceLabel: "만대항", campZone: "north-taean", terrain: "암반·모래" },
+-  { id: "sinduri", name: "신두리 해수욕장", region: "taean", source: "sinduri", sourceLabel: "신두리항", campZone: "north-taean", terrain: "모래·갯벌" },
+-  { id: "hakampo", name: "학암포 해수욕장", region: "taean", source: "hakampo", sourceLabel: "학암포항", campZone: "north-taean", terrain: "암반·모래" },
+-  { id: "iwon_dike", name: "이원방조제", region: "taean", source: "iwon_dike", sourceLabel: "이원방조제", campZone: "north-taean", terrain: "방조제·펄·모래" },
+-  { id: "guryepo", name: "구례포 해수욕장", region: "taean", source: "guryepo", sourceLabel: "학암포항", campZone: "north-taean", terrain: "암반·모래·웅덩이" },
+-  { id: "gureumpo", name: "구름포 해수욕장", region: "taean", source: "gureumpo", sourceLabel: "모항항", campZone: "west-taean", terrain: "암반·모래·웅덩이" },
+-  { id: "uihang", name: "의항 해수욕장", region: "taean", source: "uihang", sourceLabel: "모항항", campZone: "west-taean", terrain: "암반·모래" },
+-  { id: "gareumi", name: "갈음이 해수욕장", region: "taean", source: "gareumi", sourceLabel: "안흥항", campZone: "west-taean", terrain: "암반·모래·웅덩이" },
+-  { id: "mallipo", name: "만리포·천리포", region: "taean", source: "mallipo", sourceLabel: "모항항", campZone: "west-taean", terrain: "모래·암반" },
+-  { id: "mongsanpo", name: "몽산포 해수욕장", region: "taean", source: "mongsanpo", sourceLabel: "몽산포항", campZone: "central-taean", terrain: "넓은 갯벌" },
+-  { id: "dangampo", name: "당암포구", region: "taean", source: "dangampo", sourceLabel: "당암포구", campZone: "central-taean", terrain: "포구·펄갯벌·수로" },
+-  { id: "jinsanri", name: "진산리 갯벌체험장", region: "taean", source: "jinsanri", sourceLabel: "진산리어촌계", campZone: "central-taean", terrain: "단단한 모래·갯벌" },
+-  { id: "kkotji", name: "꽃지·방포 해변", region: "taean", source: "kkotji", sourceLabel: "방포항", campZone: "anmyeon", terrain: "암반·모래" },
+-  { id: "gomsom", name: "곰섬해수욕장", region: "taean", source: "gomsom", sourceLabel: "마검포항", campZone: "central-taean", terrain: "갯벌·모래" },
+-  { id: "mageompo", name: "마검포항·마검포해수욕장", region: "taean", source: "mageompo", sourceLabel: "마검포항", campZone: "central-taean", terrain: "포구·갯벌·모래" },
+-  { id: "deuruni", name: "드르니항", region: "taean", source: "deuruni", sourceLabel: "드르니항", campZone: "anmyeon", terrain: "갯벌·수로" },
+-  { id: "sinjindo", name: "신진도항", region: "taean", source: "sinjindo", sourceLabel: "신진도항", campZone: "west-taean", terrain: "암반·방파제" },
+-  { id: "anheung", name: "안흥항", region: "taean", source: "anheung", sourceLabel: "안흥항", campZone: "west-taean", terrain: "암반·방파제" },
+-  { id: "yeonpo", name: "연포 해수욕장", region: "taean", source: "yeonpo", sourceLabel: "연포항", campZone: "central-taean", terrain: "모래·암반" },
+-  { id: "padory", name: "파도리 해수욕장", region: "taean", source: "padory", sourceLabel: "모항항", campZone: "west-taean", terrain: "자갈·암반" },
+-  { id: "eoeundol", name: "어은돌 해수욕장", region: "taean", source: "eoeundol", sourceLabel: "모항항", campZone: "west-taean", terrain: "모래·암반" },
+-  { id: "baekripo", name: "백리포 해수욕장", region: "taean", source: "baekripo", sourceLabel: "모항항", campZone: "west-taean", terrain: "모래·암반" },
+-  { id: "cheongpodae", name: "청포대 해수욕장", region: "taean", source: "cheongpodae", sourceLabel: "몽산포항", campZone: "central-taean", terrain: "넓은 갯벌" },
+-  { id: "dalsanpo", name: "달산포 해수욕장", region: "taean", source: "dalsanpo", sourceLabel: "몽산포항", campZone: "central-taean", terrain: "모래·갯벌" },
+-  { id: "sambong", name: "삼봉 해수욕장", region: "taean", source: "sambong", sourceLabel: "백사장항", campZone: "anmyeon", terrain: "모래·갯벌" },
+-  { id: "batgae", name: "밧개 해수욕장", region: "taean", source: "batgae", sourceLabel: "방포항", campZone: "anmyeon", terrain: "모래·갯벌" },
+-  { id: "saetbyeol", name: "샛별 해수욕장", region: "taean", source: "saetbyeol", sourceLabel: "방포항", campZone: "anmyeon", terrain: "모래·암반" },
+-  { id: "baramarae", name: "바람아래 해수욕장", region: "taean", source: "baramarae", sourceLabel: "영목항", campZone: "anmyeon", terrain: "갯벌·모래" },
+-  { id: "yeonyukgyo", name: "태안 연육교", region: "taean", source: "yeonyukgyo", sourceLabel: "안면대교", campZone: "anmyeon", terrain: "갯벌·수로" },
+-  { id: "hwangdo", name: "황도·황도항", region: "taean", source: "hwangdo", sourceLabel: "황도항", campZone: "anmyeon", terrain: "갯벌·바위" },
+-  { id: "ganwoldo", name: "간월도", region: "seosan", source: "ganwoldo", sourceLabel: "간월도항", campZone: "seosan", terrain: "갯벌·돌밭" },
+-  { id: "jungri", name: "중리어촌체험마을", region: "seosan", source: "jungri", sourceLabel: "중리항", campZone: "seosan", terrain: "갯벌" },
+-  { id: "garorim", name: "가로림만", region: "seosan", source: "garorim", sourceLabel: "구도항", campZone: "seosan", terrain: "갯벌·수로" },
+-  { id: "beolcheonpo", name: "벌천포해수욕장", region: "seosan", source: "beolcheonpo", sourceLabel: "벌천포", campZone: "seosan", terrain: "몽돌·갯벌·갯바위" },
+-  { id: "samgilpo", name: "삼길포항", region: "seosan", source: "samgilpo", sourceLabel: "삼길포항", campZone: "seosan", terrain: "항구·방파제·갯바위" },
+-  { id: "muchangpo", name: "무창포 해수욕장", region: "boryeong", source: "muchangpo", sourceLabel: "무창포항", campZone: "boryeong", terrain: "모래·갯벌" },
+-  { id: "doksan", name: "보령 독산 해수욕장", region: "boryeong", source: "doksan", sourceLabel: "무창포항", campZone: "boryeong", terrain: "넓은 모래·갯벌" },
+-  { id: "daecheon", name: "대천 해수욕장", region: "boryeong", source: "daecheon", sourceLabel: "대천항", campZone: "boryeong", terrain: "모래" },
+-  { id: "seondori", name: "선도리 갯벌체험장", region: "boryeong", source: "seondori", sourceLabel: "홍원항", campZone: "boryeong", terrain: "갯벌" },
+-  { id: "chunjangdae", name: "서천 춘장대 해수욕장", region: "boryeong", source: "chunjangdae", sourceLabel: "홍원항", campZone: "boryeong", terrain: "모래·갯벌" },
+-  { id: "biin", name: "비인해변", region: "boryeong", source: "biin", sourceLabel: "비인해변", campZone: "boryeong", terrain: "넓은 모래·갯벌" },
+-  { id: "waemok", name: "왜목마을", region: "dangjin", source: "waemok", sourceLabel: "왜목항", campZone: "dangjin", terrain: "돌밭·갯벌" },
+-  { id: "janggohang", name: "장고항", region: "dangjin", source: "janggohang", sourceLabel: "장고항", campZone: "dangjin", terrain: "포구·갯벌·갯바위" },
+-  { id: "seokmun_dike", name: "석문방조제", region: "dangjin", source: "seokmun_dike", sourceLabel: "석문방조제", campZone: "dangjin", terrain: "방조제·펄갯벌·깊은 수로" },
+-  { id: "dobido", name: "도비도", region: "dangjin", source: "dobido", sourceLabel: "도비도항", campZone: "dangjin", terrain: "갯벌·수로" },
+-  { id: "haengdamdo", name: "행담도", region: "dangjin", source: "haengdamdo", sourceLabel: "행담도", campZone: "dangjin", terrain: "섬·펄갯벌·수로" },
+-  { id: "jebudo", name: "제부도", region: "metro", source: "jebudo", sourceLabel: "제부항", campZone: "metro", terrain: "갯벌·암반" },
+-  { id: "daebudo", name: "대부도", region: "metro", source: "daebudo", sourceLabel: "방아머리항", campZone: "metro", terrain: "갯벌" },
+-  { id: "dongmak", name: "강화 동막해변", region: "metro", source: "dongmak", sourceLabel: "분오리항", campZone: "metro", terrain: "갯벌" },
+-  { id: "deokjeokdo", name: "덕적도", region: "metro", source: "deokjeokdo", sourceLabel: "덕적도항", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "janggyeongri", name: "장경리 해수욕장", region: "metro", source: "janggyeongri", sourceLabel: "영흥도항", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "seonjaedo", name: "선재도 측도", region: "metro", source: "seonjaedo", sourceLabel: "선재도항", campZone: "metro", terrain: "갯벌·수로" },
+-  { id: "eulwangri", name: "을왕리 해수욕장", region: "metro", source: "eulwangri", sourceLabel: "용유항", campZone: "metro", terrain: "모래·암반" },
+-  { id: "keunmuri", name: "큰무리어촌체험마을", region: "metro", source: "keunmuri", sourceLabel: "큰무리항", campZone: "metro", terrain: "갯벌" },
+-  { id: "ganghwa_bunori", name: "강화 분오리돈대 갯벌", region: "metro", source: "ganghwa_bunori", sourceLabel: "분오리항", campZone: "metro", terrain: "갯벌" },
+-  { id: "ganghwa_janghwari", name: "강화 장화리 갯벌", region: "metro", source: "ganghwa_janghwari", sourceLabel: "장화리", campZone: "metro", terrain: "갯벌" },
+-  { id: "ganghwa_hwangsando", name: "강화 황산도 갯벌", region: "metro", source: "ganghwa_hwangsando", sourceLabel: "황산도항", campZone: "metro", terrain: "갯벌" },
+-  { id: "ganghwa_oepoh", name: "강화 외포항 갯벌", region: "metro", source: "ganghwa_oepoh", sourceLabel: "외포항", campZone: "metro", terrain: "갯벌·수로" },
+-  { id: "muui_silmi", name: "무의도 실미 해수욕장", region: "metro", source: "muui_silmi", sourceLabel: "실미도", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "somuui", name: "소무의도 갯벌", region: "metro", source: "somuui", sourceLabel: "소무의항", campZone: "metro", terrain: "갯벌·암반" },
+-  { id: "songdo", name: "송도 갯벌", region: "metro", source: "songdo", sourceLabel: "인천항", campZone: "metro", terrain: "갯벌" },
+-  { id: "seonjaedo_eochon", name: "선재도 어촌체험마을", region: "metro", source: "seonjaedo_eochon", sourceLabel: "선재도항", campZone: "metro", terrain: "갯벌" },
+-  { id: "masian", name: "마시안 해변", region: "metro", source: "masian", sourceLabel: "용유항", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "seonnyeobawi", name: "선녀바위 해수욕장", region: "metro", source: "seonnyeobawi", sourceLabel: "용유항", campZone: "metro", terrain: "모래·암반" },
+-  { id: "muui_hanagae", name: "무의도 하나개 해수욕장", region: "metro", source: "muui_hanagae", sourceLabel: "하나개항", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "wangsan", name: "왕산 해수욕장", region: "metro", source: "wangsan", sourceLabel: "용유항", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "seokmodo", name: "석모도 민머루 해수욕장", region: "metro", source: "seokmodo", sourceLabel: "석모도", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "bangameori", name: "대부도 방아머리 해수욕장", region: "metro", source: "bangameori", sourceLabel: "방아머리항", campZone: "metro", terrain: "모래·갯벌" },
+-  { id: "daebudo_dongju", name: "대부도 동주염전 갯벌", region: "metro", source: "daebudo_dongju", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
+-  { id: "daebudo_yeongjeon", name: "대부도 영전 갯벌", region: "metro", source: "daebudo_yeongjeon", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
+-  { id: "ippado", name: "입파도", region: "metro", source: "ippado", sourceLabel: "입파도", campZone: "metro", terrain: "암반·모래" },
+-  { id: "jonghyeon", name: "종현어촌체험마을", region: "metro", source: "jonghyeon", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
+-  { id: "daemyeong", name: "김포 대명항", region: "metro", source: "daemyeong", sourceLabel: "대명항", campZone: "metro", terrain: "갯벌·수로" },
+-  { id: "heulgot", name: "흘곶어촌체험마을", region: "metro", source: "heulgot", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
+-  { id: "jeburi_eochon", name: "제부리어촌체험마을", region: "metro", source: "jeburi_eochon", sourceLabel: "제부항", campZone: "metro", terrain: "갯벌" },
+-  { id: "gungpyeongri", name: "궁평리어촌체험마을", region: "metro", source: "gungpyeongri", sourceLabel: "궁평항", campZone: "metro", terrain: "갯벌" },
+-  { id: "seongam", name: "대부도 선감어촌체험마을", region: "metro", source: "seongam", sourceLabel: "선감항", campZone: "metro", terrain: "갯벌" },
+-  { id: "baekmiri", name: "백미리 해수욕장", region: "metro", source: "baekmiri", sourceLabel: "백미리", campZone: "metro", terrain: "갯벌·모래" },
+-  { id: "ueumdo", name: "우음도", region: "metro", source: "ueumdo", sourceLabel: "시화호", campZone: "metro", terrain: "갯벌" },
+-  { id: "pungdo", name: "풍도어촌체험마을", region: "metro", source: "pungdo", sourceLabel: "풍도항", campZone: "metro", terrain: "암반·갯벌" },
+-  { id: "oido", name: "오이도어촌체험마을", region: "metro", source: "oido", sourceLabel: "오이도", campZone: "metro", terrain: "갯벌" },
+-  { id: "byeonsan", name: "변산해수욕장", region: "honam", source: "byeonsan", sourceLabel: "변산해수욕장", campZone: "honam", terrain: "고운 모래·완만한 갯벌" },
+-  { id: "seonyudo", name: "군산 선유도", region: "honam", source: "seonyudo", sourceLabel: "선유도항", campZone: "honam", terrain: "모래·갯벌" },
+-  { id: "mokpo", name: "목포 갯벌", region: "honam", source: "mokpo", sourceLabel: "목포", campZone: "honam", terrain: "갯벌" },
+-  { id: "muan", name: "무안 도리포 갯벌", region: "honam", source: "muan", sourceLabel: "도리포항", campZone: "honam", terrain: "갯벌" },
+-];
++
+ 
+ const NEWLY_ADDED_SPOT_IDS = ["dangampo", "seokmun_dike", "iwon_dike", "haengdamdo", "janggohang"] as const;
+ 
+@@ -338,8 +256,9 @@ function top5Score(data: Conditions, distance: number, terrain: string) {
+   const lowest = lows.length ? Math.min(...lows) : 300;
+   const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+   const conditionPoints = data.score * .28;
+-  const rangePoints = clamp((range - 120) / 400) * 22;
+-  const lowPoints = clamp((260 - lowest) / 220) * 12;
++  const preferredTide = (getTideAdjustment(getMulTtae(data.date)) ?? 0) > 0;
++  const rangePoints = preferredTide ? clamp((range - 120) / 400) * 22 : 0;
++  const lowPoints = preferredTide ? clamp((260 - lowest) / 220) * 12 : 0;
+   const weatherPoints = data.sourceStatus.weather
+     ? clamp(22 - data.weather.wind * 1.45 - data.weather.rain * .8 - (data.weather.waveHeight ?? 0) * 3 - data.weather.rainProbability * .03, 0, 22)
+     : 11;
+@@ -365,7 +284,8 @@ function speciesRankScore(species: RankSpecies, spot: typeof SPOTS[number], data
+   const lows = data.tides.filter(tide => tide.type === "low").map(tide => tide.height);
+   const range = heights.length > 1 ? Math.max(...heights) - Math.min(...heights) : 0;
+   const lowest = lows.length ? Math.min(...lows) : 300;
+-  const tidePoints = clamp((range - 120) / 420, 0, 1) * 12 + clamp((280 - lowest) / 240, 0, 1) * 13;
++  const mulLabel = getMulTtae(data.date);
++  const tidePoints = getTideAdjustment(mulLabel) ?? 0;
+ 
+   const dayLow = data.recommendedWindows?.some(window => window.period === "낮") ?? false;
+   const nightLow = data.recommendedWindows?.some(window => window.period === "밤") ?? false;
+@@ -378,7 +298,7 @@ function speciesRankScore(species: RankSpecies, spot: typeof SPOTS[number], data
+   const seasonPoints = season.peak.includes(month) ? 15 : season.good.includes(month) ? 10 : 4;
+ 
+   const visibility = getWaterVisibility(data, spot.terrain);
+-  const visibilityPoints = visibility.level === "비교적 깨끗" ? 10 : visibility.level === "약간 흐림" ? 7 : visibility.level === "많이 흐림" ? 3 : 0;
++  const visibilityPoints = getVisibilityAdjustment(visibility.level) ?? 0;
+   const fieldBonus = FIELD_REPORT_BONUS[species]?.[spot.id] ?? 0;
+   const aquacultureBonus = AQUACULTURE_ECOLOGY_BONUS[species]?.[spot.id] ?? 0;
+   const evidence = SPECIES_EVIDENCE[species]?.[spot.id]
+@@ -390,8 +310,8 @@ function speciesRankScore(species: RankSpecies, spot: typeof SPOTS[number], data
+   const reasons = [
+     evidence,
+     `${spot.terrain}: 맞는 지형 요소 ${matchedTerms.join("·") || "적음"} → 지형 ${habitatPoints}/30점`,
+-    `조차 ${Math.round(range)}cm·최저조위 ${Math.round(lowest)}cm → 물때 ${tidePoints.toFixed(1)}/25점`,
+-    `${timeGuide.icon} ${timeGuide.label}·${matchingLow ? "맞는 시간대 간조 있음" : "맞는 시간대 간조 없음"}·수중시야 ${visibility.level} → 시간 ${timingPoints}/15, 시야 ${visibilityPoints}/10점`,
++    `물때 ${mulLabel} → ${signedPoints(tidePoints)} · 조차 ${Math.round(range)}cm·최저조위 ${Math.round(lowest)}cm`,
++    `${timeGuide.icon} ${timeGuide.label}·${matchingLow ? "맞는 시간대 간조 있음" : "맞는 시간대 간조 없음"}·수중시야 ${visibility.level} → 시간 ${timingPoints}/15, 물색 ${signedPoints(visibilityPoints)}`,
+     `${month}월 계절점수 ${seasonPoints}/15점: ${season.text}`,
+   ];
+   if (fieldBonus) reasons.push(`공개 현장 경험 가산 ${Math.min(5, fieldBonus * .5).toFixed(1)}점`);
+@@ -469,7 +389,8 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
+     { name: "백합", season: "깨끗한 모래갯벌", closed: false, rule: "금지체장·마을어장·지역 제한 확인" },
+   ];
+   const mulLabel = getMulTtae(date);
+-  const mulNumber = Number.parseInt(mulLabel, 10) || 0;
++  const tideAdjustment = getTideAdjustment(mulLabel);
++  const visibilityAdjustment = getVisibilityAdjustment(getWaterVisibility(data ?? null, terrain).level);
+   const lows = data?.tides.filter(tide => tide.type === "low") ?? [];
+   const lowest = lows.length ? Math.min(...lows.map(tide => tide.height)) : null;
+   const tideRange = data && data.tides.length > 1 ? Math.max(...data.tides.map(tide => tide.height)) - Math.min(...data.tides.map(tide => tide.height)) : null;
+@@ -500,10 +421,12 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
+     if (item.closed) return { ...item, timeGuide, score: 0, grade: "채취 금지", reasons: ["현재 금어기이므로 물때가 좋아도 채취하면 안 돼요."] };
+     let score = 48;
+     const reasons: string[] = [];
+-    if (mulNumber >= 4 && mulNumber <= 10) { score += 11; reasons.push(`${mulLabel}은 조금 뒤 조차가 커지는 구간이라 간조 때 드러나는 면적이 늘 가능성이 있어요.`); }
+-    else if (mulNumber >= 11 && mulNumber <= 13) { score += 5; reasons.push(`${mulLabel}은 조차가 크지만 유속도 강해질 수 있어 안전과 탁도를 함께 봐야 해요.`); }
+-    else if (mulLabel === "조금" || mulLabel === "무시") { score -= 6; reasons.push(`${mulLabel}은 조차가 작아 바닥이 드러나는 범위가 좁을 수 있어요.`); }
+-    else { score += 2; reasons.push(`${mulLabel}은 조차가 다시 커지기 시작하는 초반 구간이에요.`); }
++    score += tideAdjustment ?? 0;
++    reasons.push(tideAdjustment === null ? "물때 미확인으로 물때 가감점을 보류했어요." : `${mulLabel} · 물때 ${signedPoints(tideAdjustment)} (4·5·6물만 가점)`);
++    if (visibilityAdjustment !== null && visibilityAdjustment < 0) {
++      score += visibilityAdjustment;
++      reasons.push(`예상 물색이 흐려 ${signedPoints(visibilityAdjustment)}을 반영했어요.`);
++    }
+     const fit = habitat[item.name];
+     score += fit.match ? fit.bonus : -Math.round(fit.bonus * .8);
+     reasons.push(fit.match ? fit.good : fit.bad);
+@@ -516,10 +439,10 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
+     if (location === "waemok" && (item.name === "광어" || item.name === "우럭")) { score += 10; reasons.push("왜목마을에서 실제 광어·우럭을 다수 관찰한 사용자 현장기록을 반영했어요."); }
+     if (location === "mongsanpo" && ["꽃게", "농어", "숭어"].includes(item.name)) { score += 9; reasons.push("몽산포에서 꽃게와 농어·숭어류를 관찰한 사용자 현장기록을 반영했어요."); }
+     if (tideRange !== null) {
+-      if (tideRange >= 350) { score += 8; reasons.push(`오늘 조차가 약 ${Math.round(tideRange)}cm로 커서 간조 노출 면적을 기대할 수 있어요.`); }
++      if (tideAdjustment !== null && tideAdjustment > 0 && tideRange >= 350) { score += 8; reasons.push(`오늘 조차가 약 ${Math.round(tideRange)}cm로 커서 간조 노출 면적을 기대할 수 있어요.`); }
+       else if (tideRange < 180) { score -= 7; reasons.push(`오늘 조차가 약 ${Math.round(tideRange)}cm로 작아 노출 면적이 제한될 수 있어요.`); }
+     }
+-    if (lowest !== null && lowest <= 120) { score += 5; reasons.push(`가장 낮은 저조위가 약 ${Math.round(lowest)}cm라 얕은 구역을 살피기 유리해요.`); }
++    if (tideAdjustment !== null && tideAdjustment > 0 && lowest !== null && lowest <= 120) { score += 5; reasons.push(`가장 낮은 저조위가 약 ${Math.round(lowest)}cm라 얕은 구역을 살피기 유리해요.`); }
+     const timeWindowMatches = timeGuide.preference === "day" ? hasDayLow : timeGuide.preference === "night" ? hasNightLow : hasDayLow || hasNightLow;
+     if (timeWindowMatches) {
+       score += timeGuide.preference === "either" ? 3 : 7;
+@@ -542,48 +465,6 @@ function getSpecies(date: string, location: string, terrain: string, data: Condi
+   return { rows: rankedRows, year, mulLabel };
+ }
+ 
+-function getWaterVisibility(data: Conditions | null, terrain: string) {
+-  if (!data) return { level: "확인 중", className: "visibility-wait", icon: "🔎", goggles: "판정 대기", wave: "확인 중", reasons: ["확인된 날씨와 물때 자료가 없어 시야를 판단할 수 없어요."] };
+-  if (!data.sourceStatus.weather || data.weather.waveHeight === null) return { level: "날씨·파고 미확인", className: "visibility-wait", icon: "☁️", goggles: "현장 확인 필요", wave: "발표 없음", reasons: ["공식 바람·강수·파고 예보가 없어 물속 시야를 판정하지 않았어요.", `${terrain} 지형은 현장에서 탁도와 파도를 직접 확인하세요.`] };
+-  const rain = data.sourceStatus.weather ? data.weather.rain : 0;
+-  const recent = data.sourceStatus.recentRain ? data.recentRain : null;
+-  const wind = data.sourceStatus.weather ? data.weather.wind : 0;
+-  const range = data.tides.length > 1 ? Math.max(...data.tides.map(t => t.height)) - Math.min(...data.tides.map(t => t.height)) : 0;
+-  let score = 0;
+-  const reasons: string[] = [];
+-  if (recent) {
+-    if (recent.last72h !== null && recent.last72h >= 50) { score += 5; reasons.push(`최근 3일 누적 ${recent.last72h}mm로 흙탕물 유입 영향이 매우 커요.`); }
+-    else if (recent.last72h !== null && recent.last72h >= 30) { score += 4; reasons.push(`최근 3일 누적 ${recent.last72h}mm로 물이 흐릴 가능성이 커요.`); }
+-    else if (recent.last48h !== null && recent.last48h >= 15) { score += 3; reasons.push(`최근 이틀 ${recent.last48h}mm가 내려 전날 빗물 영향이 남을 수 있어요.`); }
+-    else if (recent.last24h !== null && recent.last24h >= 5) { score += 2; reasons.push(`전날 ${recent.last24h}mm가 내려 얕은 곳은 흐릴 수 있어요.`); }
+-    else if (recent.last24h !== null && recent.last24h > 0) { score += 1; reasons.push(`전날 ${recent.last24h}mm의 비가 내려 갯벌·수로에는 약한 잔여 영향이 있을 수 있어요.`); }
+-    else if (recent.last72h !== null) reasons.push("최근 3일 관측 강수량이 적어 이전 비의 영향은 크지 않아요.");
+-    else reasons.push(`최근 3일 중 ${recent.coverageDays ?? 0}일만 확인되어 확인된 강수만 반영했어요.`);
+-    if (recent.consecutiveRainDays >= 2) { score += 2; reasons.push(`${recent.consecutiveRainDays}일 연속 비가 내려 부유물과 펄이 가라앉는 데 시간이 필요해요.`); }
+-  } else {
+-    reasons.push("최근 3일 관측 강수자료는 없어 당일 예보 중심으로 판정했어요.");
+-  }
+-  if (rain >= 10) { score += 4; reasons.push("강한 비가 펄과 흙탕물을 유입시켜요."); }
+-  else if (rain >= 3) { score += 3; reasons.push("비 때문에 물속 시야가 나빠질 수 있어요."); }
+-  else if (rain > 0) { score += 2; reasons.push("약한 비에도 얕은 갯벌은 쉽게 흐려져요."); }
+-  else reasons.push("예보 강수는 없어 빗물 영향이 적어요.");
+-  if (wind >= 8) { score += 3; reasons.push("강한 바람이 바닥을 뒤집어 탁도가 높아져요."); }
+-  else if (wind >= 5) { score += 2; reasons.push("바람으로 잔물결과 부유물이 늘 수 있어요."); }
+-  else if (wind >= 3.5) { score += 1; reasons.push("약간의 바람 영향이 예상돼요."); }
+-  else reasons.push("바람이 약해 수면은 비교적 잔잔해요.");
+-  if (terrain.includes("갯벌") || terrain.includes("펄")) { score += 2; reasons.push("갯벌·펄 지형은 발을 디디면 커피물처럼 흐려지기 쉬워요."); }
+-  else if (terrain.includes("모래")) { score += 1; reasons.push("모래가 일면 시야가 잠시 흐려질 수 있어요."); }
+-  else reasons.push("암반 지형은 갯벌보다 흙탕물 영향이 적어요.");
+-  if (range >= 450) { score += 1; reasons.push("조차가 커 물살이 바닥을 더 많이 흔들 수 있어요."); }
+-  const waveHeight = data.sourceStatus.weather ? (data.weather.waveHeight ?? 0) : 0;
+-  if (waveHeight >= 1.5) { score += 3; reasons.push("높은 파고가 바닥 부유물을 크게 늘려요."); }
+-  else if (waveHeight >= .8) { score += 2; reasons.push("파도가 있어 얕은 물의 시야가 흐려질 수 있어요."); }
+-  const wave = waveHeight >= 1.5 || wind >= 8 ? "거침" : waveHeight >= .8 || wind >= 5 ? "출렁임" : waveHeight >= .3 || wind >= 3.5 ? "잔물결" : "잔잔";
+-  if (score >= 7) return { level: "커피물 가능성 큼", className: "visibility-coffee", icon: "☕", goggles: "수경 효과 적음", wave, reasons };
+-  if (score >= 5) return { level: "많이 흐림", className: "visibility-murky", icon: "🟤", goggles: "수경 효과 제한적", wave, reasons };
+-  if (score >= 3) return { level: "약간 흐림", className: "visibility-cloudy", icon: "🌫️", goggles: "수경 있으면 도움", wave, reasons };
+-  return { level: "비교적 깨끗", className: "visibility-clear", icon: "💎", goggles: "수경 추천", wave, reasons };
+-}
+ 
+ function getRainEvidence(data: Conditions | null) {
+   if (!data?.sourceStatus.weather) return [];
+@@ -1207,13 +1088,14 @@ export default function Home() {
+               {rainEvidence.map(item => <div key={item.label}><small>{item.label}</small><strong>{item.value}</strong><span>{item.note}</span></div>)}
+             </div>}
+             <p className="visibility-summary">{visibility.reasons[0]}</p>
++            <p className="visibility-summary"><b>종합점수 물색 반영: {hasOverallScore ? signedPoints(data?.scoreBreakdown?.visibility) : "확인 중"}</b></p>
+             <details className="progressive-details visibility-details"><summary><span>시야 이유와 계산 기준 보기</span><small>자세히</small></summary><ul>{visibility.reasons.slice(1).map(reason => <li key={reason}>{reason}</li>)}</ul><p className="estimate-note">이전 1·2·3일 일강수 합계와 연속 강우, 당일 비·바람·파고·조차·바닥 지형을 합산한 예상이에요. 하천·방류구 유입에 따라 현장은 달라질 수 있어요.</p></details>
+           </section>
+ 
+           <section className="section-card decision-card overview-step">
+             <div className="overview-step-head"><span>3</span><div><small>마지막으로 확인</small><h2>자료 확보 상태</h2></div><b>공식 자료 {data?.confidence?.officialSources ?? 0}/3</b></div>
+             <div className="decision-title"><div><small>자료 완성도</small><h3>{data?.confidence?.level ?? "확인 중"}</h3></div><b className={data?.confidence ? `confidence-${data.confidence.level}` : "confidence-loading"}>{!data?.confidence ? "확인 중" : data.confidence.level === "높음" ? "자료 확보됨" : data.confidence.level === "보통" ? "기준점·범위 확인" : "현장 확인 필요"}</b></div>
+-            <details className="progressive-details confidence-details"><summary><span>자료 출처와 계산 기준 보기</span><small>{data?.confidence?.reasons?.length ?? 0}개 확인 근거</small></summary><div className="score-breakdown"><span>물때 <b>{data?.scoreBreakdown?.tide ?? 0}/60</b></span><span>출조시간 날씨 <b>{data?.scoreBreakdown?.weather ?? 0}/25</b></span><span>최근 강수·시야 <b>{data?.scoreBreakdown?.visibility ?? 0}/15</b></span></div><ul>{(data?.confidence?.reasons ?? ["공식 자료를 불러오는 중이에요."]).map(reason => <li key={reason}>{reason}</li>)}</ul></details>
++            <details className="progressive-details confidence-details"><summary><span>자료 출처와 계산 기준 보기</span><small>{data?.confidence?.reasons?.length ?? 0}개 확인 근거</small></summary><div className="score-breakdown"><span>기본 <b>{hasOverallScore ? `${data?.scoreBreakdown?.base ?? 60}점` : "확인 중"}</b></span><span>물때 {getMulTtae(date)} <b>{hasOverallScore ? signedPoints(data?.scoreBreakdown?.tide) : "확인 중"}</b></span><span>출조시간 날씨 <b>{hasOverallScore ? signedPoints(data?.scoreBreakdown?.weather) : "확인 중"}</b></span><span>물색 <b>{hasOverallScore ? signedPoints(data?.scoreBreakdown?.visibility) : "확인 중"}</b></span></div><p className="formula-note">{SCORE_POLICY_DESCRIPTION}</p><ul>{(data?.confidence?.reasons ?? ["공식 자료를 불러오는 중이에요."]).map(reason => <li key={reason}>{reason}</li>)}</ul></details>
+           </section>
+         </div>
+         <section className="recommend-card">
+@@ -1371,10 +1253,11 @@ export default function Home() {
+           </section>
+           <section className="section-card score-card">
+             <h2>4단계 판단 기준</h2>
+-            <div><b className="best">최상</b><p>간조·조차 조건이 좋고 바람과 비가 안전 범위</p></div>
++            <div><b className="best">최상</b><p>4·5·6물 가점과 물색·날씨를 합산해 85점 이상</p></div>
+             <div><b className="good">좋음</b><p>대체로 적합하지만 현장 확인이 필요한 날</p></div>
+             <div><b className="middle">중간</b><p>노출 시간이나 날씨 중 하나가 아쉬운 날</p></div>
+             <div><b className="bad">나쁨</b><p>강풍·강수 또는 물때가 맞지 않아 권하지 않는 날</p></div>
++            <p className="formula-note">{SCORE_POLICY_DESCRIPTION}</p>
+             <p className="formula-note">바람 10m/s 이상 또는 강한 비가 예상되면 물때 점수와 관계없이 ‘나쁨’으로 제한합니다.</p>
+           </section>
+           <div className="danger-box"><strong>해루질 지수는 안전을 보장하지 않아요.</strong><p>출발 전 기상특보와 현장 통제 여부를 다시 확인하고, 반드시 2인 이상 활동하며 들물 전에 철수하세요.</p></div>
+diff --git a/lib/score-policy.ts b/lib/score-policy.ts
+new file mode 100644
+index 0000000..4e8ab7e
+--- /dev/null
++++ b/lib/score-policy.ts
+@@ -0,0 +1,22 @@
++/** Community preference, not a scientific prediction of catch or safety. */
++export function getTideAdjustment(mulLabel: string): number | null {
++  if (["4물", "5물", "6물"].includes(mulLabel)) return 15;
++  if (/^(?:[1-9]|1[0-3])물$/.test(mulLabel) || mulLabel === "조금" || mulLabel === "무시") return -15;
++  return null;
++}
++
++export function getVisibilityAdjustment(level: string): number | null {
++  switch (level) {
++    case "비교적 깨끗": return 0;
++    case "약간 흐림": return -10;
++    case "많이 흐림": return -20;
++    case "커피물 가능성 큼": return -30;
++    default: return null;
++  }
++}
++
++export function signedPoints(value: number | null | undefined) {
++  return value == null ? "미확인" : `${value > 0 ? "+" : ""}${value}점`;
++}
++
++export const SCORE_POLICY_DESCRIPTION = "기본 60점 + 날씨 최대 25점. 4·5·6물만 +15점, 나머지 물때는 −15점. 물색은 약간 흐림 −10점, 많이 흐림 −20점, 커피물 가능성 큼 −30점. 최종 점수는 0~100점입니다.";
+diff --git a/lib/spots.ts b/lib/spots.ts
+new file mode 100644
+index 0000000..84b20ec
+--- /dev/null
++++ b/lib/spots.ts
+@@ -0,0 +1,88 @@
++// Shared place metadata keeps displayed terrain and scoring inputs identical.
++export const SPOTS = [
++  { id: "gujina", name: "꾸지나무골 해수욕장", region: "taean", source: "gujina", sourceLabel: "만대항", campZone: "north-taean", terrain: "암반·모래" },
++  { id: "sinduri", name: "신두리 해수욕장", region: "taean", source: "sinduri", sourceLabel: "신두리항", campZone: "north-taean", terrain: "모래·갯벌" },
++  { id: "hakampo", name: "학암포 해수욕장", region: "taean", source: "hakampo", sourceLabel: "학암포항", campZone: "north-taean", terrain: "암반·모래" },
++  { id: "iwon_dike", name: "이원방조제", region: "taean", source: "iwon_dike", sourceLabel: "이원방조제", campZone: "north-taean", terrain: "방조제·펄·모래" },
++  { id: "guryepo", name: "구례포 해수욕장", region: "taean", source: "guryepo", sourceLabel: "학암포항", campZone: "north-taean", terrain: "암반·모래·웅덩이" },
++  { id: "gureumpo", name: "구름포 해수욕장", region: "taean", source: "gureumpo", sourceLabel: "모항항", campZone: "west-taean", terrain: "암반·모래·웅덩이" },
++  { id: "uihang", name: "의항 해수욕장", region: "taean", source: "uihang", sourceLabel: "모항항", campZone: "west-taean", terrain: "암반·모래" },
++  { id: "gareumi", name: "갈음이 해수욕장", region: "taean", source: "gareumi", sourceLabel: "안흥항", campZone: "west-taean", terrain: "암반·모래·웅덩이" },
++  { id: "mallipo", name: "만리포·천리포", region: "taean", source: "mallipo", sourceLabel: "모항항", campZone: "west-taean", terrain: "모래·암반" },
++  { id: "mongsanpo", name: "몽산포 해수욕장", region: "taean", source: "mongsanpo", sourceLabel: "몽산포항", campZone: "central-taean", terrain: "넓은 갯벌" },
++  { id: "dangampo", name: "당암포구", region: "taean", source: "dangampo", sourceLabel: "당암포구", campZone: "central-taean", terrain: "포구·펄갯벌·수로" },
++  { id: "jinsanri", name: "진산리 갯벌체험장", region: "taean", source: "jinsanri", sourceLabel: "진산리어촌계", campZone: "central-taean", terrain: "단단한 모래·갯벌" },
++  { id: "kkotji", name: "꽃지·방포 해변", region: "taean", source: "kkotji", sourceLabel: "방포항", campZone: "anmyeon", terrain: "암반·모래" },
++  { id: "gomsom", name: "곰섬해수욕장", region: "taean", source: "gomsom", sourceLabel: "마검포항", campZone: "central-taean", terrain: "갯벌·모래" },
++  { id: "mageompo", name: "마검포항·마검포해수욕장", region: "taean", source: "mageompo", sourceLabel: "마검포항", campZone: "central-taean", terrain: "포구·갯벌·모래" },
++  { id: "deuruni", name: "드르니항", region: "taean", source: "deuruni", sourceLabel: "드르니항", campZone: "anmyeon", terrain: "갯벌·수로" },
++  { id: "sinjindo", name: "신진도항", region: "taean", source: "sinjindo", sourceLabel: "신진도항", campZone: "west-taean", terrain: "암반·방파제" },
++  { id: "anheung", name: "안흥항", region: "taean", source: "anheung", sourceLabel: "안흥항", campZone: "west-taean", terrain: "암반·방파제" },
++  { id: "yeonpo", name: "연포 해수욕장", region: "taean", source: "yeonpo", sourceLabel: "연포항", campZone: "central-taean", terrain: "모래·암반" },
++  { id: "padory", name: "파도리 해수욕장", region: "taean", source: "padory", sourceLabel: "모항항", campZone: "west-taean", terrain: "자갈·암반" },
++  { id: "eoeundol", name: "어은돌 해수욕장", region: "taean", source: "eoeundol", sourceLabel: "모항항", campZone: "west-taean", terrain: "모래·암반" },
++  { id: "baekripo", name: "백리포 해수욕장", region: "taean", source: "baekripo", sourceLabel: "모항항", campZone: "west-taean", terrain: "모래·암반" },
++  { id: "cheongpodae", name: "청포대 해수욕장", region: "taean", source: "cheongpodae", sourceLabel: "몽산포항", campZone: "central-taean", terrain: "넓은 갯벌" },
++  { id: "dalsanpo", name: "달산포 해수욕장", region: "taean", source: "dalsanpo", sourceLabel: "몽산포항", campZone: "central-taean", terrain: "모래·갯벌" },
++  { id: "sambong", name: "삼봉 해수욕장", region: "taean", source: "sambong", sourceLabel: "백사장항", campZone: "anmyeon", terrain: "모래·갯벌" },
++  { id: "batgae", name: "밧개 해수욕장", region: "taean", source: "batgae", sourceLabel: "방포항", campZone: "anmyeon", terrain: "모래·갯벌" },
++  { id: "saetbyeol", name: "샛별 해수욕장", region: "taean", source: "saetbyeol", sourceLabel: "방포항", campZone: "anmyeon", terrain: "모래·암반" },
++  { id: "baramarae", name: "바람아래 해수욕장", region: "taean", source: "baramarae", sourceLabel: "영목항", campZone: "anmyeon", terrain: "갯벌·모래" },
++  { id: "yeonyukgyo", name: "태안 연육교", region: "taean", source: "yeonyukgyo", sourceLabel: "안면대교", campZone: "anmyeon", terrain: "갯벌·수로" },
++  { id: "hwangdo", name: "황도·황도항", region: "taean", source: "hwangdo", sourceLabel: "황도항", campZone: "anmyeon", terrain: "갯벌·바위" },
++  { id: "ganwoldo", name: "간월도", region: "seosan", source: "ganwoldo", sourceLabel: "간월도항", campZone: "seosan", terrain: "갯벌·돌밭" },
++  { id: "jungri", name: "중리어촌체험마을", region: "seosan", source: "jungri", sourceLabel: "중리항", campZone: "seosan", terrain: "갯벌" },
++  { id: "garorim", name: "가로림만", region: "seosan", source: "garorim", sourceLabel: "구도항", campZone: "seosan", terrain: "갯벌·수로" },
++  { id: "beolcheonpo", name: "벌천포해수욕장", region: "seosan", source: "beolcheonpo", sourceLabel: "벌천포", campZone: "seosan", terrain: "몽돌·갯벌·갯바위" },
++  { id: "samgilpo", name: "삼길포항", region: "seosan", source: "samgilpo", sourceLabel: "삼길포항", campZone: "seosan", terrain: "항구·방파제·갯바위" },
++  { id: "muchangpo", name: "무창포 해수욕장", region: "boryeong", source: "muchangpo", sourceLabel: "무창포항", campZone: "boryeong", terrain: "모래·갯벌" },
++  { id: "doksan", name: "보령 독산 해수욕장", region: "boryeong", source: "doksan", sourceLabel: "무창포항", campZone: "boryeong", terrain: "넓은 모래·갯벌" },
++  { id: "daecheon", name: "대천 해수욕장", region: "boryeong", source: "daecheon", sourceLabel: "대천항", campZone: "boryeong", terrain: "모래" },
++  { id: "seondori", name: "선도리 갯벌체험장", region: "boryeong", source: "seondori", sourceLabel: "홍원항", campZone: "boryeong", terrain: "갯벌" },
++  { id: "chunjangdae", name: "서천 춘장대 해수욕장", region: "boryeong", source: "chunjangdae", sourceLabel: "홍원항", campZone: "boryeong", terrain: "모래·갯벌" },
++  { id: "biin", name: "비인해변", region: "boryeong", source: "biin", sourceLabel: "비인해변", campZone: "boryeong", terrain: "넓은 모래·갯벌" },
++  { id: "waemok", name: "왜목마을", region: "dangjin", source: "waemok", sourceLabel: "왜목항", campZone: "dangjin", terrain: "돌밭·갯벌" },
++  { id: "janggohang", name: "장고항", region: "dangjin", source: "janggohang", sourceLabel: "장고항", campZone: "dangjin", terrain: "포구·갯벌·갯바위" },
++  { id: "seokmun_dike", name: "석문방조제", region: "dangjin", source: "seokmun_dike", sourceLabel: "석문방조제", campZone: "dangjin", terrain: "방조제·펄갯벌·깊은 수로" },
++  { id: "dobido", name: "도비도", region: "dangjin", source: "dobido", sourceLabel: "도비도항", campZone: "dangjin", terrain: "갯벌·수로" },
++  { id: "haengdamdo", name: "행담도", region: "dangjin", source: "haengdamdo", sourceLabel: "행담도", campZone: "dangjin", terrain: "섬·펄갯벌·수로" },
++  { id: "jebudo", name: "제부도", region: "metro", source: "jebudo", sourceLabel: "제부항", campZone: "metro", terrain: "갯벌·암반" },
++  { id: "daebudo", name: "대부도", region: "metro", source: "daebudo", sourceLabel: "방아머리항", campZone: "metro", terrain: "갯벌" },
++  { id: "dongmak", name: "강화 동막해변", region: "metro", source: "dongmak", sourceLabel: "분오리항", campZone: "metro", terrain: "갯벌" },
++  { id: "deokjeokdo", name: "덕적도", region: "metro", source: "deokjeokdo", sourceLabel: "덕적도항", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "janggyeongri", name: "장경리 해수욕장", region: "metro", source: "janggyeongri", sourceLabel: "영흥도항", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "seonjaedo", name: "선재도 측도", region: "metro", source: "seonjaedo", sourceLabel: "선재도항", campZone: "metro", terrain: "갯벌·수로" },
++  { id: "eulwangri", name: "을왕리 해수욕장", region: "metro", source: "eulwangri", sourceLabel: "용유항", campZone: "metro", terrain: "모래·암반" },
++  { id: "keunmuri", name: "큰무리어촌체험마을", region: "metro", source: "keunmuri", sourceLabel: "큰무리항", campZone: "metro", terrain: "갯벌" },
++  { id: "ganghwa_bunori", name: "강화 분오리돈대 갯벌", region: "metro", source: "ganghwa_bunori", sourceLabel: "분오리항", campZone: "metro", terrain: "갯벌" },
++  { id: "ganghwa_janghwari", name: "강화 장화리 갯벌", region: "metro", source: "ganghwa_janghwari", sourceLabel: "장화리", campZone: "metro", terrain: "갯벌" },
++  { id: "ganghwa_hwangsando", name: "강화 황산도 갯벌", region: "metro", source: "ganghwa_hwangsando", sourceLabel: "황산도항", campZone: "metro", terrain: "갯벌" },
++  { id: "ganghwa_oepoh", name: "강화 외포항 갯벌", region: "metro", source: "ganghwa_oepoh", sourceLabel: "외포항", campZone: "metro", terrain: "갯벌·수로" },
++  { id: "muui_silmi", name: "무의도 실미 해수욕장", region: "metro", source: "muui_silmi", sourceLabel: "실미도", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "somuui", name: "소무의도 갯벌", region: "metro", source: "somuui", sourceLabel: "소무의항", campZone: "metro", terrain: "갯벌·암반" },
++  { id: "songdo", name: "송도 갯벌", region: "metro", source: "songdo", sourceLabel: "인천항", campZone: "metro", terrain: "갯벌" },
++  { id: "seonjaedo_eochon", name: "선재도 어촌체험마을", region: "metro", source: "seonjaedo_eochon", sourceLabel: "선재도항", campZone: "metro", terrain: "갯벌" },
++  { id: "masian", name: "마시안 해변", region: "metro", source: "masian", sourceLabel: "용유항", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "seonnyeobawi", name: "선녀바위 해수욕장", region: "metro", source: "seonnyeobawi", sourceLabel: "용유항", campZone: "metro", terrain: "모래·암반" },
++  { id: "muui_hanagae", name: "무의도 하나개 해수욕장", region: "metro", source: "muui_hanagae", sourceLabel: "하나개항", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "wangsan", name: "왕산 해수욕장", region: "metro", source: "wangsan", sourceLabel: "용유항", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "seokmodo", name: "석모도 민머루 해수욕장", region: "metro", source: "seokmodo", sourceLabel: "석모도", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "bangameori", name: "대부도 방아머리 해수욕장", region: "metro", source: "bangameori", sourceLabel: "방아머리항", campZone: "metro", terrain: "모래·갯벌" },
++  { id: "daebudo_dongju", name: "대부도 동주염전 갯벌", region: "metro", source: "daebudo_dongju", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
++  { id: "daebudo_yeongjeon", name: "대부도 영전 갯벌", region: "metro", source: "daebudo_yeongjeon", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
++  { id: "ippado", name: "입파도", region: "metro", source: "ippado", sourceLabel: "입파도", campZone: "metro", terrain: "암반·모래" },
++  { id: "jonghyeon", name: "종현어촌체험마을", region: "metro", source: "jonghyeon", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
++  { id: "daemyeong", name: "김포 대명항", region: "metro", source: "daemyeong", sourceLabel: "대명항", campZone: "metro", terrain: "갯벌·수로" },
++  { id: "heulgot", name: "흘곶어촌체험마을", region: "metro", source: "heulgot", sourceLabel: "대부도", campZone: "metro", terrain: "갯벌" },
++  { id: "jeburi_eochon", name: "제부리어촌체험마을", region: "metro", source: "jeburi_eochon", sourceLabel: "제부항", campZone: "metro", terrain: "갯벌" },
++  { id: "gungpyeongri", name: "궁평리어촌체험마을", region: "metro", source: "gungpyeongri", sourceLabel: "궁평항", campZone: "metro", terrain: "갯벌" },
++  { id: "seongam", name: "대부도 선감어촌체험마을", region: "metro", source: "seongam", sourceLabel: "선감항", campZone: "metro", terrain: "갯벌" },
++  { id: "baekmiri", name: "백미리 해수욕장", region: "metro", source: "baekmiri", sourceLabel: "백미리", campZone: "metro", terrain: "갯벌·모래" },
++  { id: "ueumdo", name: "우음도", region: "metro", source: "ueumdo", sourceLabel: "시화호", campZone: "metro", terrain: "갯벌" },
++  { id: "pungdo", name: "풍도어촌체험마을", region: "metro", source: "pungdo", sourceLabel: "풍도항", campZone: "metro", terrain: "암반·갯벌" },
++  { id: "oido", name: "오이도어촌체험마을", region: "metro", source: "oido", sourceLabel: "오이도", campZone: "metro", terrain: "갯벌" },
++  { id: "byeonsan", name: "변산해수욕장", region: "honam", source: "byeonsan", sourceLabel: "변산해수욕장", campZone: "honam", terrain: "고운 모래·완만한 갯벌" },
++  { id: "seonyudo", name: "군산 선유도", region: "honam", source: "seonyudo", sourceLabel: "선유도항", campZone: "honam", terrain: "모래·갯벌" },
++  { id: "mokpo", name: "목포 갯벌", region: "honam", source: "mokpo", sourceLabel: "목포", campZone: "honam", terrain: "갯벌" },
++  { id: "muan", name: "무안 도리포 갯벌", region: "honam", source: "muan", sourceLabel: "도리포항", campZone: "honam", terrain: "갯벌" },
++];
+diff --git a/lib/water-visibility.ts b/lib/water-visibility.ts
+new file mode 100644
+index 0000000..f017c52
+--- /dev/null
++++ b/lib/water-visibility.ts
+@@ -0,0 +1,50 @@
++/** An estimate from weather, recent rain and terrain; shared by the API and UI. */
++export type VisibilityConditions = {
++  sourceStatus: { weather: boolean; recentRain?: boolean };
++  weather: { rain: number; wind: number; waveHeight: number | null };
++  tides: Array<{ height: number }>;
++  recentRain?: { last24h: number | null; last48h: number | null; last72h: number | null; consecutiveRainDays: number; coverageDays?: number } | null;
++};
++
++export function getWaterVisibility(data: VisibilityConditions | null, terrain: string) {
++  if (!data) return { level: "확인 중", className: "visibility-wait", icon: "🔎", goggles: "판정 대기", wave: "확인 중", reasons: ["확인된 날씨와 물때 자료가 없어 시야를 판단할 수 없어요."] };
++  if (!data.sourceStatus.weather || data.weather.waveHeight === null) return { level: "날씨·파고 미확인", className: "visibility-wait", icon: "☁️", goggles: "현장 확인 필요", wave: "발표 없음", reasons: ["공식 바람·강수·파고 예보가 없어 물속 시야를 판정하지 않았어요.", `${terrain} 지형은 현장에서 탁도와 파도를 직접 확인하세요.`] };
++  const rain = data.sourceStatus.weather ? data.weather.rain : 0;
++  const recent = data.sourceStatus.recentRain ? data.recentRain : null;
++  const wind = data.sourceStatus.weather ? data.weather.wind : 0;
++  const range = data.tides.length > 1 ? Math.max(...data.tides.map(t => t.height)) - Math.min(...data.tides.map(t => t.height)) : 0;
++  let score = 0;
++  const reasons: string[] = [];
++  if (recent) {
++    if (recent.last72h !== null && recent.last72h >= 50) { score += 5; reasons.push(`최근 3일 누적 ${recent.last72h}mm로 흙탕물 유입 영향이 매우 커요.`); }
++    else if (recent.last72h !== null && recent.last72h >= 30) { score += 4; reasons.push(`최근 3일 누적 ${recent.last72h}mm로 물이 흐릴 가능성이 커요.`); }
++    else if (recent.last48h !== null && recent.last48h >= 15) { score += 3; reasons.push(`최근 이틀 ${recent.last48h}mm가 내려 전날 빗물 영향이 남을 수 있어요.`); }
++    else if (recent.last24h !== null && recent.last24h >= 5) { score += 2; reasons.push(`전날 ${recent.last24h}mm가 내려 얕은 곳은 흐릴 수 있어요.`); }
++    else if (recent.last24h !== null && recent.last24h > 0) { score += 1; reasons.push(`전날 ${recent.last24h}mm의 비가 내려 갯벌·수로에는 약한 잔여 영향이 있을 수 있어요.`); }
++    else if (recent.last72h !== null) reasons.push("최근 3일 관측 강수량이 적어 이전 비의 영향은 크지 않아요.");
++    else reasons.push(`최근 3일 중 ${recent.coverageDays ?? 0}일만 확인되어 확인된 강수만 반영했어요.`);
++    if (recent.consecutiveRainDays >= 2) { score += 2; reasons.push(`${recent.consecutiveRainDays}일 연속 비가 내려 부유물과 펄이 가라앉는 데 시간이 필요해요.`); }
++  } else {
++    reasons.push("최근 3일 관측 강수자료는 없어 당일 예보 중심으로 판정했어요.");
++  }
++  if (rain >= 10) { score += 4; reasons.push("강한 비가 펄과 흙탕물을 유입시켜요."); }
++  else if (rain >= 3) { score += 3; reasons.push("비 때문에 물속 시야가 나빠질 수 있어요."); }
++  else if (rain > 0) { score += 2; reasons.push("약한 비에도 얕은 갯벌은 쉽게 흐려져요."); }
++  else reasons.push("예보 강수는 없어 빗물 영향이 적어요.");
++  if (wind >= 8) { score += 3; reasons.push("강한 바람이 바닥을 뒤집어 탁도가 높아져요."); }
++  else if (wind >= 5) { score += 2; reasons.push("바람으로 잔물결과 부유물이 늘 수 있어요."); }
++  else if (wind >= 3.5) { score += 1; reasons.push("약간의 바람 영향이 예상돼요."); }
++  else reasons.push("바람이 약해 수면은 비교적 잔잔해요.");
++  if (terrain.includes("갯벌") || terrain.includes("펄")) { score += 2; reasons.push("갯벌·펄 지형은 발을 디디면 커피물처럼 흐려지기 쉬워요."); }
++  else if (terrain.includes("모래")) { score += 1; reasons.push("모래가 일면 시야가 잠시 흐려질 수 있어요."); }
++  else reasons.push("암반 지형은 갯벌보다 흙탕물 영향이 적어요.");
++  if (range >= 450) { score += 1; reasons.push("조차가 커 물살이 바닥을 더 많이 흔들 수 있어요."); }
++  const waveHeight = data.sourceStatus.weather ? (data.weather.waveHeight ?? 0) : 0;
++  if (waveHeight >= 1.5) { score += 3; reasons.push("높은 파고가 바닥 부유물을 크게 늘려요."); }
++  else if (waveHeight >= .8) { score += 2; reasons.push("파도가 있어 얕은 물의 시야가 흐려질 수 있어요."); }
++  const wave = waveHeight >= 1.5 || wind >= 8 ? "거침" : waveHeight >= .8 || wind >= 5 ? "출렁임" : waveHeight >= .3 || wind >= 3.5 ? "잔물결" : "잔잔";
++  if (score >= 7) return { level: "커피물 가능성 큼", className: "visibility-coffee", icon: "☕", goggles: "수경 효과 적음", wave, reasons };
++  if (score >= 5) return { level: "많이 흐림", className: "visibility-murky", icon: "🟤", goggles: "수경 효과 제한적", wave, reasons };
++  if (score >= 3) return { level: "약간 흐림", className: "visibility-cloudy", icon: "🌫️", goggles: "수경 있으면 도움", wave, reasons };
++  return { level: "비교적 깨끗", className: "visibility-clear", icon: "💎", goggles: "수경 추천", wave, reasons };
++}
+diff --git a/tests/score-policy.test.mjs b/tests/score-policy.test.mjs
+new file mode 100644
+index 0000000..0666137
+--- /dev/null
++++ b/tests/score-policy.test.mjs
+@@ -0,0 +1,96 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { getTideAdjustment, getVisibilityAdjustment } from '../lib/score-policy.ts';
++import { getWaterVisibility } from '../lib/water-visibility.ts';
++import { getMulTtae } from '../lib/tide-calendar.ts';
++import { SPOTS } from '../lib/spots.ts';
++
++test('only 4, 5 and 6 mul earn points across every supported phase', () => {
++  const labels = [...Array.from({length: 13}, (_, i) => `${i + 1}물`), '조금', '무시'];
++  for (const label of labels) assert.equal(getTideAdjustment(label), ['4물', '5물', '6물'].includes(label) ? 15 : -15, label);
++  for (const label of ['확인', '', '14물']) assert.equal(getTideAdjustment(label), null);
++});
++
++test('the displayed water-colour estimate maps to increasing negative adjustments', () => {
++  const data = (rain, wind = 0) => ({sourceStatus:{weather:true,recentRain:false},weather:{rain,wind,waveHeight:0},tides:[{height:600},{height:50}]});
++  const expected = [[0,0,'비교적 깨끗',0],[0.5,0,'약간 흐림',-10],[3,0,'많이 흐림',-20],[3,5,'커피물 가능성 큼',-30]];
++  for (const [rain, wind, level, penalty] of expected) {
++    const result = getWaterVisibility(data(rain, wind), '모래');
++    assert.equal(result.level, level);
++    assert.equal(getVisibilityAdjustment(result.level), penalty);
++  }
++  const missingWave = data(0); missingWave.weather.waveHeight = null;
++  assert.equal(getVisibilityAdjustment(getWaterVisibility(missingWave, '갯벌').level), null);
++  assert.equal(getVisibilityAdjustment(getWaterVisibility(null, '갯벌').level), null);
++});
++
++test('all configured places retain terrain for API and screen scoring', () => {
++  assert.ok(SPOTS.length > 50);
++  assert.ok(SPOTS.every(spot => spot.terrain && spot.source === spot.id));
++  assert.equal(new Set(SPOTS.map(spot => spot.source)).size, SPOTS.length);
++});
++
++const dates = Array.from({length: 32}, (_, i) => {
++  const day = new Date(); day.setUTCDate(day.getUTCDate() + i + 1);
++  return day.toISOString().slice(0, 10);
++});
++const items = rows => new Response(JSON.stringify({response:{header:{resultCode:'00'},body:{items:{item:rows}}}}));
++
++async function scenario(tag, run) {
++  const original = globalThis.fetch, oldKey = process.env.PUBLIC_DATA_API_KEY;
++  process.env.PUBLIC_DATA_API_KEY = 'fixture-key';
++  let current = {date: dates[0], rain: 0, wind: 0, wave: 0};
++  globalThis.fetch = async input => {
++    const url = new URL(String(input));
++    if (url.pathname.includes('tideFcstHghLw')) return items(['04:00','10:00','16:00','22:00'].map((time,i) => ({predcDt:current.date+' '+time,predcTdlvVl:i%2?'50':'600',extrSe:String(i+1)})));
++    if (url.pathname.includes('getVilageFcst')) {
++      const fields = {TMP:'20',WSD:String(current.wind),PCP:current.rain ? String(current.rain) : '강수없음',POP:'0',REH:'70',SKY:'1',PTY:current.rain ? '1' : '0',WAV:String(current.wave)};
++      if (current.wave === null) delete fields.WAV;
++      return items(Array.from({length:24},(_,hour) => Object.entries(fields).map(([category,fcstValue]) => ({category,fcstValue,fcstDate:current.date.replaceAll('-',''),fcstTime:String(hour).padStart(2,'0')+'00'}))).flat());
++    }
++    return new Response('',{status:503});
++  };
++  try {
++    let index = 0;
++    await run(async overrides => {
++      current = {...current,...overrides};
++      // Each scenario has independent conditions and provider caches.
++      const worker = (await import(`../dist/server/index.js?score=${tag}-${index++}`)).default;
++      return (await worker.fetch(new Request(`http://localhost/api/conditions?location=${overrides.location ?? 'anheung'}&date=${current.date}&precision=nearby`),{ASSETS:{fetch:async()=>new Response('',{status:404})}},{waitUntil(){},passThroughOnException(){}})).json();
++    });
++  } finally {
++    globalThis.fetch = original;
++    if (oldKey === undefined) delete process.env.PUBLIC_DATA_API_KEY; else process.env.PUBLIC_DATA_API_KEY = oldKey;
++  }
++}
++
++test('built API uses selected-date mul, negative off-cycle points, and the displayed terrain estimate', () => scenario('phases', async call => {
++  for (const label of ['3물','4물','5물','6물','7물','조금','무시']) {
++    const date = dates.find(day => getMulTtae(day) === label);
++    assert.ok(date, label);
++    const data = await call({date, rain:0, wind:0, wave:0});
++    assert.equal(data.live, true);
++    assert.equal(data.mulTtae, label);
++    assert.equal(data.scoreBreakdown.tide, ['4물','5물','6물'].includes(label) ? 15 : -15);
++    assert.equal(data.score, ['4물','5물','6물'].includes(label) ? 100 : 70);
++    const terrain = SPOTS.find(spot => spot.source === 'anheung').terrain;
++    assert.deepEqual(data.waterVisibility, getWaterVisibility(data, terrain));
++    assert.equal(data.scoreBreakdown.visibility, getVisibilityAdjustment(data.waterVisibility.level));
++  }
++}));
++
++test('built API subtracts murky water, keeps missing water unknown, and retains the dangerous-weather cap', () => scenario('water', async call => {
++  const date = dates.find(day => getMulTtae(day) === '4물');
++  const clear = await call({date,rain:0,wind:0,wave:0,location:'gujina'});
++  const cloudy = await call({date,rain:0.5,wind:0,wave:0,location:'gujina'});
++  const murky = await call({date,rain:3,wind:0,wave:0,location:'gujina'});
++  const coffee = await call({date,rain:3,wind:5,wave:0,location:'gujina'});
++  assert.deepEqual([clear,cloudy,murky,coffee].map(data=>data.scoreBreakdown.visibility), [0,-10,-20,-30]);
++  assert.ok(clear.score > cloudy.score && cloudy.score > murky.score && murky.score > coffee.score);
++  const unknown = await call({date,rain:0,wind:0,wave:null});
++  assert.equal(unknown.scoreBreakdown.visibility, null);
++  const dangerous = await call({date,rain:0,wind:10,wave:0});
++  assert.ok(dangerous.score <= 34);
++  assert.equal(dangerous.rating, '나쁨');
++  assert.ok(dangerous.riskFlags.includes('강풍 위험'));
++}));
+diff --git a/tests/source-integrity.test.mjs b/tests/source-integrity.test.mjs
+index 50bc117..56e7414 100644
+--- a/tests/source-integrity.test.mjs
++++ b/tests/source-integrity.test.mjs
+@@ -5,12 +5,13 @@ import test from "node:test";
+ const projectUrl = new URL("../", import.meta.url);
+ 
+ test("every visible place has one explicit tide mapping", async () => {
+-  const [page, calendar, tidePoints] = await Promise.all([
++  const [page, calendar, tidePoints, spots] = await Promise.all([
+     readFile(new URL("app/page.tsx", projectUrl), "utf8"),
+     readFile(new URL("app/calendar/page.tsx", projectUrl), "utf8"),
+     readFile(new URL("lib/tide-points.ts", projectUrl), "utf8"),
++    readFile(new URL("lib/spots.ts", projectUrl), "utf8"),
+   ]);
+-  const spotBlock = page.match(/const SPOTS = \[([\s\S]*?)\n\];/)?.[1] ?? "";
++  const spotBlock = spots.match(/const SPOTS = \[([\s\S]*?)\n\];/)?.[1] ?? "";
+   const spotIds = [...spotBlock.matchAll(/\bsource:\s*"([^"]+)"/g)].map((match) => match[1]);
+   const officialIds = [...tidePoints.matchAll(/(?:^|[{,])\s*ids:\s*\[([^\]]*)\]/gm)]
+     .flatMap((match) => [...match[1].matchAll(/"([^"]+)"/g)].map((id) => id[1]));
+@@ -50,13 +51,14 @@ test("nearby fallback is transparent and never uses invented time offsets", asyn
+ });
+ 
+ test("requested west-coast places are searchable once and fully data-backed", async () => {
+-  const [page, calendar, route, tidePoints] = await Promise.all([
++  const [page, calendar, route, tidePoints, spots] = await Promise.all([
+     readFile(new URL("app/page.tsx", projectUrl), "utf8"),
+     readFile(new URL("app/calendar/page.tsx", projectUrl), "utf8"),
+     readFile(new URL("app/api/conditions/route.ts", projectUrl), "utf8"),
+     readFile(new URL("lib/tide-points.ts", projectUrl), "utf8"),
++    readFile(new URL("lib/spots.ts", projectUrl), "utf8"),
+   ]);
+-  const spotBlock = page.match(/const SPOTS = \[([\s\S]*?)\n\];/)?.[1] ?? "";
++  const spotBlock = spots.match(/const SPOTS = \[([\s\S]*?)\n\];/)?.[1] ?? "";
+   const calendarBlock = calendar.match(/const CALENDAR_PLACES = \[([\s\S]*?)\n\] as const;/)?.[1] ?? "";
+   const newIds = ["dangampo", "seokmun_dike", "iwon_dike", "haengdamdo", "janggohang", "samgilpo", "beolcheonpo", "jinsanri", "biin", "byeonsan"];
+   const allRequestedIds = [...newIds, "dobido", "doksan", "sinduri", "gomsom", "mageompo", "baramarae", "muchangpo", "chunjangdae"];
+@@ -73,7 +75,7 @@ test("requested west-coast places are searchable once and fully data-backed", as
+   }
+ 
+   for (const name of ["당암포구", "석문방조제", "이원방조제", "행담도", "장고항", "삼길포항", "벌천포해수욕장", "진산리 갯벌체험장", "비인해변", "변산해수욕장", "곰섬해수욕장", "마검포항"]) {
+-    assert.match(page, new RegExp(name));
++    assert.match(page + spots, new RegExp(name));
+   }
+   assert.match(page, /const NEWLY_ADDED_SPOT_IDS = \["dangampo", "seokmun_dike", "iwon_dike", "haengdamdo", "janggohang"\]/);
+   assert.match(page, /이번에 추가된 장소 바로 선택/);
