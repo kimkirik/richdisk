@@ -2327,3 +2327,47 @@ footer > p {
 button:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid #165dff; outline-offset: 3px; }
 @media (max-width: 800px) { .reliable-alerts { flex-wrap: wrap; } .reliable-alerts > div { flex: 1; min-width: 200px; } .reliable-alerts a { margin-left: 35px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .spin { animation: none; } }
+
+/* Interest watch and private family comparison extend the existing blue workspace. */
+.onyang-watch { margin-bottom: 24px; padding: 22px; background: var(--paper); border: 1px solid #c8d8ff; border-top: 4px solid var(--blue); border-radius: var(--radius); font-size: 1rem; line-height: 1.6; }
+.onyang-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.onyang-heading h2 { margin: 8px 0 2px; font-size: 1.5rem; line-height: 1.35; }
+.onyang-heading p, .watch-details p { margin: 8px 0; }
+.watch-badge { display: inline-flex; align-items: center; gap: 5px; font-size: .875rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--blue-soft); color: var(--blue-dark); }
+.watch-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 9px 14px; background: var(--blue); color: white; border-radius: 9px; font-size: .875rem; font-weight: 700; cursor: pointer; }
+.watch-button.secondary { background: var(--blue-soft); color: var(--blue-dark); }
+.watch-button:disabled { opacity: .55; cursor: wait; }
+.watch-status { margin: 18px 0 10px; padding: 12px; border-radius: 8px; background: var(--canvas); font-weight: 700; }
+.onyang-watch small, .watch-status small { display: block; font-size: .875rem; color: #526079; font-weight: 400; }
+.watch-details { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
+.watch-details summary { cursor: pointer; font-size: 1rem; font-weight: 700; min-height: 36px; }
+.watch-details summary svg { display: inline; vertical-align: middle; margin-right: 5px; }
+.watch-facts { margin: 14px 0; }
+.watch-facts > div { display: grid; grid-template-columns: 105px minmax(0,1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--soft-line); }
+.watch-facts dt { color: var(--muted); font-size: .875rem; }
+.watch-facts dd { margin: 0; }
+.preferred-areas { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.preferred-areas > div { padding: 12px; border-radius: 10px; background: var(--blue-soft); }
+.preferred-areas b { display: block; font-size: 1.1rem; }
+.preferred-areas b span { font-weight: 500; font-size: .875rem; }
+.watch-aliases { display: flex; flex-wrap: wrap; gap: 7px; padding: 0; margin: 10px 0; list-style: none; }
+.watch-aliases li { font-size: .875rem; padding: 4px 9px; background: var(--canvas); border-radius: 5px; }
+.watch-sources, .watch-actions, .parents-badges { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.watch-sources a { display: inline-flex; align-items: center; gap: 5px; font-size: .875rem; color: var(--blue-dark); text-decoration: underline; }
+.parents-form { display: flex; flex-wrap: wrap; gap: 14px; margin: 14px 0; }
+.parents-form label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.parents-form input { width: 20px; height: 20px; accent-color: var(--blue); }
+.parents-form select { padding: 7px; border: 1px solid var(--line); border-radius: 6px; }
+.parents-badges span { border-radius: 5px; background: var(--green-soft); color: #096c4f; padding: 3px 8px; font-size: .875rem; }
+.parents-comparison { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: white; margin-bottom: 20px; line-height: 1.6; }
+.parents-comparison h3 { display: flex; align-items: center; gap: 8px; font-size: 1rem; margin: 0 0 8px; }
+.parents-comparison p { font-size: .875rem; color: #526079; margin: 8px 0; }
+.parents-comparison ul { padding: 0; list-style: none; margin: 12px 0; }
+.parents-comparison li { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; border-bottom: 1px solid var(--soft-line); padding: 9px 0; font-size: .875rem; }
+.watch-matches button { width: 100%; padding: 12px 0; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); cursor: pointer; }
+.watch-matches button span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .onyang-watch { padding: 16px; } .watch-facts > div { grid-template-columns: 1fr; gap: 2px; } .preferred-areas { grid-template-columns: 1fr; } }
+
+.watch-workspace { max-width: 1440px; margin: 20px auto 0; padding: 0 28px; }
+.watch-workspace .onyang-watch { margin-bottom: 0; }
+@media (max-width: 780px) { .watch-workspace { padding: 0 16px; margin-top: 16px; } }

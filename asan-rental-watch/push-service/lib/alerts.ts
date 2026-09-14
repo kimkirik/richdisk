@@ -1,7 +1,8 @@
-export type Notice = { id: string; title: string; alertKey?: string; status?: string; archivedAt?: string; needsVerification?: boolean; applicationStartAt?: string; applicationEndAt?: string; closeAt?: string };
+export const APP_URL = 'https://asan-rental-push.kimkirik.chatgpt.site/';
+import { watchAlertTitle, type WatchNotice } from './watch-target.ts';
+export type Notice = WatchNotice & { id: string; title: string; alertKey?: string; status?: string; archivedAt?: string; needsVerification?: boolean; applicationStartAt?: string; applicationEndAt?: string; closeAt?: string };
 export type Snapshot = { checkedAt: string; notices: Notice[]; healthySourceCount: number; sourceCount: number };
 export type Alert = { id: string; title: string; body: string; createdAt: number; expiresAt: number; audience?: string };
-export const APP_URL = 'https://asan-rental-push.kimkirik.chatgpt.site/';
 export const day = (time: number) => new Date(time + 9 * 3600000).toISOString().slice(0, 10);
 export const endTime = (n: Notice) => n.applicationEndAt ? Date.parse(n.applicationEndAt) : n.closeAt ? Date.parse(n.closeAt + 'T23:59:59.999+09:00') : Infinity;
 export function validSnapshot(value: unknown): value is Snapshot {
@@ -19,7 +20,7 @@ export function buildAlerts(snapshot: Snapshot, known: string[] | null, now: num
     alerts.push({ id, title, body: n.title.slice(0, 600), createdAt: now, expiresAt });
   for (const n of active.filter(n => !n.needsVerification)) {
     const key = n.alertKey || n.id;
-    if (known && !known.includes(key)) add('notice:' + key, '아산 임대주택 신규·중요 변경', n);
+    if (known && !known.includes(key)) add('notice:' + key, watchAlertTitle(n) || '아산 임대주택 신규·중요 변경', n);
     const end = endTime(n);
     if (Number.isFinite(end)) {
       const days = Math.round((Date.parse(day(end)) - Date.parse(day(now))) / 86400000);
@@ -28,6 +29,7 @@ export function buildAlerts(snapshot: Snapshot, known: string[] | null, now: num
     const start = Date.parse(n.applicationStartAt || '');
     if (Number.isFinite(start) && now >= start && day(start) === day(now)) add(`start:${n.id}:${start}`, '오늘 신청 시작 · 아산집 알리미', n, Date.parse(day(now) + 'T23:59:59.999+09:00'));
   }
+  alerts.sort((a, b) => Number(b.title.startsWith('최우선')) - Number(a.title.startsWith('최우선')));
   return { alerts, known: [...new Set([...(known || []), ...keys])] };
 }
 export function validateSubscription(value: unknown): boolean {

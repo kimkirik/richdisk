@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { filterNotices, isClosed, noticeStatus, splitNotices, readStringList, saveStringList } from "@/lib/notices";
 import type { LiveNotice, NoticeResponse } from "@/lib/notices";
 import { connectPush, deviceToken, disconnectPush, pushRequest, type PushDevice } from "@/lib/push";
+import { OnyangWatch, ParentsComparison } from '@/components/onyang-watch';
+import { matchOnyang, WATCH_RULE_VERSION, type ParentsProfile } from '@/lib/watch-target';
 import { pushPlatform } from "@/lib/push-platform";
 import {
   ArrowRight,
@@ -192,6 +194,8 @@ export default function HomePage() {
   const [monitoringReady, setMonitoringReady] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [typeFilter, setTypeFilter] = useState("전체");
+  const [parentsProfile, setParentsProfile] = useState<ParentsProfile | null>(null);
+  const [watchReady, setWatchReady] = useState(false);
   const [sort, setSort] = useState("deadline");
   const [selectedNoticeId, setSelectedNoticeId] = useState(currentNotice.id);
   const inFlight = useRef(false);
@@ -240,8 +244,9 @@ export default function HomePage() {
     inFlight.current = true;
     setSourceState("checking");
     try {
-      const [data, config] = await Promise.all([requestNotices(), pushRequest<{ automaticMonitoring?: boolean }>("/config").catch(() => null)]);
+      const [data, config] = await Promise.all([requestNotices(), pushRequest<{ automaticMonitoring?: boolean; watchRuleVersion?: string }>("/config").catch(() => null)]);
       setMonitoringReady(config?.automaticMonitoring === true);
+      setWatchReady(config?.watchRuleVersion === WATCH_RULE_VERSION);
       if (!mounted.current) return;
       setNoticeData(data);
       setNow(Date.now());
@@ -418,6 +423,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      <div className="watch-workspace">
+            <OnyangWatch notices={liveNotices} ready={!!noticeData} monitoring={watchReady} connected={pushConnected} onConnect={() => setNotificationOpen(true)} onSelect={selectNotice} profile={parentsProfile} onProfile={setParentsProfile} />
+      </div>
       <div className="workspace">
         <aside className="notice-panel" aria-label="공고 목록">
           <div className="panel-heading">
@@ -465,6 +473,7 @@ export default function HomePage() {
                       </span>
                       <span>{notice.source} · {notice.type}</span>
                     </div>
+                    {matchOnyang(notice).level > 0 && <span className="watch-badge">관심 단지 · {matchOnyang(notice).level === 3 ? "명칭·주소 일치" : "관련 가능성"}</span>}
                     <h2>{notice.title}</h2>
                     <p>
                       <MapPin size={14} /> {notice.location}
@@ -535,6 +544,7 @@ export default function HomePage() {
 
         <section className="detail" id="notice">
           <div className="detail-inner">
+            {selectedNotice && <ParentsComparison notice={selectedNotice} profile={parentsProfile} />}
             <section className="reliable-alerts" aria-label="공고 알림 안내">
               <BellRing size={21} /><div><b>{!monitoringReady ? "새 공고 자동 감시 연결 대기" : platform.isIOS ? "아이폰 홈 화면에 설치하고 공고 알림을 받으세요" : "안드로이드에서 앱을 닫아도 공고 알림을 받으세요"}</b><p>{monitoringReady ? "알림을 연결하면 새 공고와 중요 변경, 신청 시작일과 마감 3일 전·1일 전·당일에 알려드립니다. 시험 알림으로 이 기기의 수신 상태를 확인하세요." : "공고 목록은 열람할 수 있습니다. 자동 감시 서버 연결이 완료되기 전까지는 새 공고 자동 알림이 동작하지 않으니 공식 공고를 직접 확인해 주세요."}</p></div>
               <a href="https://apply.lh.or.kr/lhapply/co/lo/itr/updateMberPage.do?mi=1291" target="_blank" rel="noreferrer">LH 알리미 설정 <ExternalLink size={14} /></a>

@@ -43,6 +43,7 @@ export async function deliver(env: Bindings, device: Device, event: EventRow) {
     // Workers supports manual redirects; any 3xx is rejected below without forwarding push credentials.
     const response = await fetch(JSON.parse(device.subscription).endpoint, { ...request, redirect: 'manual', signal: AbortSignal.timeout(15000) });
     if (response.status === 404 || response.status === 410) {
+      await env.DB.prepare('DELETE FROM state WHERE key=?').bind('parents-profile:' + device.id).run();
       await env.DB.prepare('DELETE FROM devices WHERE id=?').bind(device.id).run();
       return 'expired';
     }
@@ -101,7 +102,7 @@ export async function tick(env: Bindings) {
 
 export async function deliverPending(env: Bindings) {
   const now=Date.now();
-  const pending = await env.DB.prepare('SELECT d.id AS device_id,e.id AS event_id FROM devices d JOIN events e ON (e.audience IS NULL OR e.audience=d.id) LEFT JOIN deliveries l ON l.device_id=d.id AND l.event_id=e.id WHERE e.expires_at>? AND l.sent_at IS NULL AND COALESCE(l.next_attempt_at,0)<=? ORDER BY COALESCE(l.next_attempt_at,0),e.created_at LIMIT 40').bind(now, now).all<{ device_id: string; event_id: string }>();
+  const pending = await env.DB.prepare("SELECT d.id AS device_id,e.id AS event_id FROM devices d JOIN events e ON (e.audience IS NULL OR e.audience=d.id) LEFT JOIN deliveries l ON l.device_id=d.id AND l.event_id=e.id WHERE e.expires_at>? AND l.sent_at IS NULL AND COALESCE(l.next_attempt_at,0)<=? ORDER BY CASE WHEN e.title LIKE '최우선%' THEN 0 WHEN e.title LIKE '관심 단지%' THEN 1 ELSE 2 END,COALESCE(l.next_attempt_at,0),e.created_at LIMIT 40").bind(now, now).all<{ device_id: string; event_id: string }>();
   const counts: Record<string, number> = {};
   for (let i = 0; i < pending.results.length; i += 4) {
     await Promise.all(pending.results.slice(i, i + 4).map(async row => {

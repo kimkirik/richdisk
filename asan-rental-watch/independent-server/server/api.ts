@@ -1,5 +1,6 @@
+import { WATCH_RULE_VERSION, validParentsProfile } from './watch-target.ts';
 import { validateSubscription } from './alerts.ts';
-import { acknowledge, authDevice, deliver, getState, hash, putEvent, throttle, tick, type Bindings } from './service.ts';
+import { acknowledge, authDevice, deliver, getState, setState, hash, putEvent, throttle, tick, type Bindings } from './service.ts';
 const origins = new Set(['https://asan-rental-push.kimkirik.chatgpt.site', 'http://localhost:5173']);
 function reply(request: Request, data: unknown, status = 200) {
   const origin = request.headers.get('Origin') || '';
@@ -13,7 +14,7 @@ export async function handle(request: Request, e: Bindings) {
   const action = new URL(request.url).pathname.split('/').pop();
   try {
     if (request.headers.get('Origin') && request.headers.get('Origin') !== new URL(e.APP_URL).origin && !origins.has(request.headers.get('Origin')!)) return reply(request, { error: 'origin-not-allowed' }, 403);
-    if (request.method === 'GET' && action === 'config') return reply(request, { publicKey: e.VAPID_PUBLIC_KEY, senderReady: !!e.VAPID_PUBLIC_KEY && !!e.VAPID_PRIVATE_KEY, health: await getState(e, 'health'), platform: 'android', pollMinutes: 30, automaticMonitoring: true });
+    if (request.method === 'GET' && action === 'config') return reply(request, { publicKey: e.VAPID_PUBLIC_KEY, senderReady: !!e.VAPID_PUBLIC_KEY && !!e.VAPID_PRIVATE_KEY, health: await getState(e, 'health'), platform: 'android', pollMinutes: 30, automaticMonitoring: true, watchRuleVersion: WATCH_RULE_VERSION });
     if (request.method === 'POST' && action === 'tick') return reply(request, await tick(e));
     if (request.method === 'POST' && action === 'subscribe') {
       const token = request.headers.get('Authorization')?.replace(/^Bearer /, '') || '';
@@ -38,12 +39,25 @@ export async function handle(request: Request, e: Bindings) {
     }
     const device = await authDevice(e, request);
     if (!device) return reply(request, { error: 'device-not-connected' }, 401);
+    if (action === 'profile') {
+      const key = 'parents-profile:' + device.id;
+      if (request.method === 'GET') return reply(request, { profile: await getState(e, key) });
+      if (request.method === 'POST') {
+        const raw = await request.text();
+        if (raw.length > 1000) return reply(request, {error:'invalid-profile'}, 400);
+        let profile: unknown; try { profile = JSON.parse(raw); } catch { return reply(request,{error:'invalid-profile'},400); }
+        if (!validParentsProfile(profile)) return reply(request,{error:'invalid-profile'},400);
+        await setState(e,key,profile);
+        return reply(request,{profile});
+      }
+      if (request.method === 'DELETE') { await e.DB.prepare('DELETE FROM state WHERE key=?').bind(key).run(); return reply(request,{profile:null}); }
+    }
     if (request.method === 'GET' && action === 'device') {
       const receipts = await e.DB.prepare('SELECT e.id,e.title,l.sent_at,l.received_at,l.last_error FROM events e JOIN deliveries l ON l.event_id=e.id WHERE l.device_id=? ORDER BY e.created_at DESC LIMIT 10').bind(device.id).all();
       return reply(request, { connected: true, id: device.id, receipts: receipts.results, health: await getState(e, 'health') });
     }
     if (request.method === 'DELETE' && action === 'device') {
-      await e.DB.batch([e.DB.prepare('DELETE FROM devices WHERE id=?').bind(device.id), e.DB.prepare('DELETE FROM deliveries WHERE device_id=?').bind(device.id)]);
+      await e.DB.batch([e.DB.prepare('DELETE FROM devices WHERE id=?').bind(device.id), e.DB.prepare('DELETE FROM deliveries WHERE device_id=?').bind(device.id), e.DB.prepare('DELETE FROM state WHERE key=?').bind('parents-profile:' + device.id)]);
       return reply(request, { connected: false });
     }
     if (request.method === 'POST' && action === 'test') {

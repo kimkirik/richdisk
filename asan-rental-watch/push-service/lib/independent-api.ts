@@ -5,7 +5,7 @@ export async function forwardIndependent(request: Request, configuredUrl?: strin
  if (destination.protocol !== 'https:' || !destination.hostname.endsWith('.workers.dev') || destination.username || destination.password) throw new Error('Invalid independent server configuration');
  const incoming = new URL(request.url);
  const path = incoming.pathname;
- if (!/^\/api\/(config|notices|device|subscribe|receipt|test|tick|health|refresh)$/.test(path)) return Response.json({error:'not-found'},{status:404});
+ if (!/^\/api\/(config|notices|device|subscribe|receipt|test|tick|health|refresh|profile)$/.test(path)) return Response.json({error:'not-found'},{status:404});
  const headers = new Headers();
  for (const name of ['Authorization','Content-Type','Origin']) {
   const value = request.headers.get(name); if(value) headers.set(name,value);

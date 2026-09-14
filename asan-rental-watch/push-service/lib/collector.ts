@@ -1,3 +1,4 @@
+import { matchOnyang } from './watch-target.ts';
 import type { LiveNotice as Notice } from "./notices.ts";
 import { koreanToday } from "./notices.ts";
 import { reconcileNotices, stableId } from "./reconcile.ts";
@@ -181,7 +182,7 @@ async function scanMyHome(): Promise<ScanResult> {
           item.pblancId &&
           item.pblancNm &&
           item.prgrStts === "모집중" &&
-          /(임대|행복주택|공공지원민간)/.test(item.pblancNm),
+          (/(임대|행복주택|공공지원민간)/.test(item.pblancNm) || matchOnyang({title:item.pblancNm}).level > 0),
       )
       .map(
         (item) => {
@@ -240,6 +241,7 @@ export function parseLhDetails(html: string) {
   return {
     applicationStartAt: time(value("sbscAcpStDt"), value("sbscAcpStHm")),
     applicationEndAt: time(value("sbscAcpClsgDt"), value("sbscAcpClsgHm")),
+    eligibilityText: sections.join(' ').slice(0, 12000),
     contentKey: stableId("details", JSON.stringify([sections, files])),
   };
 }
@@ -256,7 +258,7 @@ export async function inspectLhBatch(candidates: LhCandidate[]): Promise<ScanRes
           const detail = await fetchHtml(item.url);
           if (!detail.includes("공고상태")) throw new Error("lh-detail-format-changed");
           const text = cleanHtml(detail);
-          const asan = /아산시|아산배방|아산탕정/.test(text) || /아산/.test(item.title);
+          const asan = /아산시|아산배방|아산탕정/.test(text) || /아산/.test(item.title) || matchOnyang({title:item.title, searchText:text}).level > 0;
           const nationwide = /전국/.test(item.region + " " + item.title) && /전세임대/.test(item.title + item.type);
           if (!asan && !nationwide) return;
           const details = parseLhDetails(detail);
@@ -267,6 +269,7 @@ export async function inspectLhBatch(candidates: LhCandidate[]): Promise<ScanRes
             postedAt: item.dates[0] ?? "", closeAt: details.applicationEndAt?.slice(0, 10) || item.dates[1] || "",
             location: item.id === "2015122300020620" ? "아산시 권곡동" : asan ? "아산시 (공고문 적용지역 확인)" : "전국 (아산 적용·자격 원문 확인)",
             url: item.url, ...details,
+            searchText: [...text.matchAll(/.{0,60}(?:온양|온천동|싸전|쌀전|주복|주상복합).{0,100}/g)].slice(0,20).map(m=>m[0]).join(' '),
           });
         } catch (error) { console.warn("LH detail unavailable", item.id, String(error)); healthy = false; }
     }));
@@ -316,10 +319,11 @@ export function parseAsanRows(html: string): Notice[] {
       );
       if (!titleMatch) return null;
       const title = cleanHtml(titleMatch[2]);
-      if (!/(임대|행복주택|영구주택|국민주택)/.test(title) || !/(모집|입주자|공급)/.test(title)) {
+      if ((!/(임대|행복주택|영구주택|국민주택)/.test(title) || !/(모집|입주자|공급)/.test(title)) && !matchOnyang({title,location:"아산시"}).level) {
         return null;
       }
-      if (/(사업계획|변경승인|건설공사|위원회|용역|사업자 모집)/.test(title)) return null;
+      const projectNews = /(사업계획|변경승인|건설공사|착공|설계공모|위원회|용역|사업자 모집)/.test(title);
+      if (projectNews && !matchOnyang({title,location:"아산시"}).level) return null;
       const href = titleMatch[1].startsWith("http")
         ? decodeEntities(titleMatch[1])
         : new URL(decodeEntities(titleMatch[1]), "https://www.asan.go.kr/main/cms/").toString();
@@ -331,8 +335,8 @@ export function parseAsanRows(html: string): Notice[] {
         id: "asan-" + rawId,
         title,
         source: "아산시청",
-        type: typeFromTitle(title),
-        status: "공고중",
+        type: projectNews ? "관심 단지 사업소식" : typeFromTitle(title),
+        status: projectNews ? "사업소식 · 모집공고 아님" : "공고중",
         postedAt: dates[0] ?? today,
         closeAt,
         location: "아산시",
@@ -344,7 +348,8 @@ export function parseAsanRows(html: string): Notice[] {
 
 async function scanAsan(): Promise<ScanResult> {
   const year = koreanToday().slice(0, 4);
-  const scans = await Promise.all([ASAN_NOTICE_SEARCH + year, ASAN_HOUSING_SEARCH + year].map(async sourceUrl => {
+  const targetSearches = ["주복", "싸전", "온양"].map(keyword => { const url=new URL(ASAN_HOUSING_SEARCH + year); url.searchParams.set("txtKeyword",keyword); return url.href; });
+  const scans = await Promise.all([ASAN_NOTICE_SEARCH + year, ASAN_HOUSING_SEARCH + year, ...targetSearches].map(async sourceUrl => {
     const notices: Notice[] = [];
     const pageKeys = new Set<string>();
     let lastPage = 1;
@@ -369,7 +374,7 @@ export function parseKohomRows(html: string): Notice[] {
   return [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map(match => match[1]).flatMap(row => {
     const id = row.match(/fn_goView\('([^']+)'\)/)?.[1];
     const cells = [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map(match => cleanHtml(match[1]));
-    if (!id || cells.length < 6 || !/아산/.test(cells[2])) return [];
+    if (!id || cells.length < 6 || (!/아산/.test(cells[2]) && !matchOnyang({title:cells[2]}).level)) return [];
     // Read the status cell, not the word "공고" inside a notice's title.
     const status = cells[5];
     return [{ id: "kohom-" + id, title: cells[2], source: "주택관리공단", type: typeFromTitle(cells[2]),

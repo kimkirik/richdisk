@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   base: "./",
   plugins: [react()],
+  server: { proxy: { '/api': { target: 'https://asan-rental-watch.kimkirik00.workers.dev', changeOrigin: true } } },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname),

@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { createECDH, hkdfSync, createDecipheriv } from 'node:crypto';
 import { buildAlerts, validateSubscription } from '../server/alerts.ts';
-import { acknowledge, deliver, hash, putEvent, throttle, tick, type Bindings } from '../server/service.ts';
+import { acknowledge, deliver, deliverPending, hash, putEvent, throttle, tick, type Bindings } from '../server/service.ts';
 
 const now = Date.parse('2026-09-07T12:00:00+09:00');
 const n = { id: 'a', title: '아산 공고', alertKey: 'a:v1', applicationStartAt: '2026-09-07T10:00:00+09:00', applicationEndAt: '2026-09-09T16:00:00+09:00' };
@@ -111,4 +111,14 @@ test('durable delivery, encrypted payload receipt, duplicate suppression and ret
     assert.equal(await throttle(env, 'lock', 60000), true);
     assert.equal(await throttle(env, 'lock', 60000), false);
   } finally { globalThis.fetch = oldFetch; db.close(); }
+});
+
+test('priority delivery bypasses a backlog of forty older notices', async () => {
+ const {db,env,subscription}=fixture();
+ db.prepare('INSERT INTO devices VALUES(?,?,?,?,?)').run('priority-device',await hash('token'),JSON.stringify(subscription),Date.now(),Date.now());
+ for(let i=0;i<45;i++) await putEvent(env,{id:'ordinary:'+i,title:'일반 공고',body:'fixture',createdAt:Date.now()-10000+i,expiresAt:Date.now()+3600000});
+ await putEvent(env,{id:'notice:target',title:'최우선 · 아산온양 주복1BL 모집공고',body:'fixture',createdAt:Date.now(),expiresAt:Date.now()+3600000});
+ const originalFetch=globalThis.fetch; globalThis.fetch=async()=>new Response(null,{status:201});
+ try {await deliverPending(env);assert.ok(db.prepare('SELECT sent_at FROM deliveries WHERE event_id=?').get('notice:target')?.sent_at);}
+ finally {globalThis.fetch=originalFetch;db.close();}
 });

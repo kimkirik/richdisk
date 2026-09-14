@@ -18,6 +18,8 @@ export type LiveNotice = {
   needsVerification?: boolean;
   lastSeenAt?: string;
   contentKey?: string;
+  searchText?: string;
+  eligibilityText?: string;
 };
 
 export type NoticeResponse = {
