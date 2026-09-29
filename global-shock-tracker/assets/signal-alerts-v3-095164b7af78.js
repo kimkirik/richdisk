@@ -23,9 +23,18 @@
       Number.isFinite(Date.parse(plan.calculatedAt)) && now - Date.parse(plan.calculatedAt) <= 30 * 60000 && Date.parse(plan.calculatedAt) <= now + 300000;
   }
   function price(value) { return '$' + Number(value).toLocaleString('en-US', {maximumFractionDigits: value < 10 ? 6 : 2}); }
+  function won(value, fx = 1) {
+    const amount = value * fx;
+    return Number.isFinite(value) && value > 0 && Number.isFinite(fx) && fx > 0 && Number.isFinite(amount)
+      ? '₩' + Math.round(amount).toLocaleString('ko-KR') : '—';
+  }
+  function fxNote(signal) {
+    const p = signal?.tradePlan;
+    return p ? `환율 1달러=${p.fx.toLocaleString('ko-KR', {maximumFractionDigits: 2})}원 (${p.fxAsOf ?? '기준일 미확인'})` : '';
+  }
   function prices(signal) {
     const p = signal?.tradePlan;
-    return p ? `참고 매수 ${price(p.entry)} / 손절 ${price(p.stop)} / 매도1 ${price(p.target1)} / 매도2 ${price(p.target2)}` : '가격 계획 보류';
+    return p ? `참고 매수 ${won(p.entry,p.fx)} / 손절 ${won(p.stop,p.fx)} / 매도1 ${won(p.target1,p.fx)} / 매도2 ${won(p.target2,p.fx)}` : '가격 계획 보류';
   }
   function candidates(payload, now = Date.now()) {
     if (!fresh(payload, 'recommendation', now) || ['high', 'cash-first'].includes(payload.cash.level)) return [];
@@ -40,12 +49,12 @@
       const rows = candidates(payload, now);
       return { triggered: rows.length > 0, key: rows.map(row => row.asset).join('>'),
         title: '코인 상승 조건 · 추천 순위',
-        body: rows.map((row, i) => `${i+1}. ${NAMES[row.asset]} ${row.score}점 — ${prices(payload[row.asset])}`).join('\n') + `\n시세 기준 ${payload[rows[0]?.asset]?.asOf ?? '—'} UTC · 1단위 USD · 손익비 1:2 / 1:3 · 확률 아님` };
+        body: rows.map((row, i) => `${i+1}. ${NAMES[row.asset]} ${row.score}점 — ${prices(payload[row.asset])}`).join('\n') + `\n시세 기준 ${payload[rows[0]?.asset]?.asOf ?? '—'} UTC · 1코인 원화 환산\n${fxNote(payload[rows[0]?.asset])} · 손익비 1:2 / 1:3 · 확률 아님` };
     }
     const signal = payload?.[kind];
     return { triggered: !!signal && fresh(payload, kind, now) && (!COINS.includes(kind) || (validPlan(signal.tradePlan, now) && fresh(payload, 'cash', now) && !['high','cash-first'].includes(payload.cash?.level))) && (kind === 'cash' ? ['high','cash-first'] : ['buy','strong-buy']).includes(signal.level),
       key: signal?.level ?? '', title: `${NAMES[kind]} 신호 · ${signal?.label ?? '자료 대기'}`,
-      body: kind === 'cash' ? signal?.summary ?? '' : COINS.includes(kind) ? `${prices(signal)}\n시세 기준 ${signal.asOf} UTC · 1단위 USD · 손익비 1:2 / 1:3 · 전략 참고값` : `${signal?.strength ?? '—'}점 — ${signal?.summary ?? ''}` };
+      body: kind === 'cash' ? signal?.summary ?? '' : COINS.includes(kind) ? `${prices(signal)}\n시세 기준 ${signal.asOf} UTC · 1코인 원화 환산\n${fxNote(signal)} · 손익비 1:2 / 1:3 · 전략 참고값` : `${signal?.strength ?? '—'}점 — ${signal?.summary ?? ''}` };
   }
   function targetUrl(base, kind) {
     const url = new URL(base); url.searchParams.set('signal', kind);
@@ -76,5 +85,5 @@
     };
     return root.navigator?.locks?.request ? root.navigator.locks.request(`shock-alert:${base}:${kind}`, check) : check();
   }
-  root.ShockAlerts = { COINS, KINDS, NAMES, CACHE, fresh, validPlan, price, prices, candidates, details, targetUrl, send };
+  root.ShockAlerts = { COINS, KINDS, NAMES, CACHE, fresh, validPlan, price, won, fxNote, prices, candidates, details, targetUrl, send };
 })(globalThis);
