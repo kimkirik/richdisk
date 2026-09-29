@@ -14,6 +14,7 @@ const write = (prefix, text, ext) => {
   writeFileSync(join(root, "assets", name), text);
   return name;
 };
+writeFileSync(join(root, "signal-data.mjs"), readFileSync(join(root, "src/data.mjs")));
 const data = write(
   "data-v2",
   readFileSync(join(root, "src/data.mjs"), "utf8"),

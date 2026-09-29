@@ -99,7 +99,30 @@ export function validateSignals(payload) {
     );
   if (!Number.isFinite(Date.parse(payload.fetchedAt)))
     throw new Error("신호 확인 시간을 확인할 수 없습니다.");
-  return payload;
+  const coins = ['btc','xrp','sol','eth','doge'];
+  const result = { ...payload, unavailable: { ...(payload.unavailable || {}) } };
+  for (const kind of coins.slice(1)) {
+    const v = result[kind];
+    if (!v || v.asset !== kind || !validDate(v.asOf) || !['wait','watch','buy','strong-buy'].includes(v.level) ||
+        !['label','summary'].every(k=>typeof v[k]==='string') || !['score','strength','priceUsd','priceKrw','dxy','usdKrw'].every(k=>Number.isFinite(v[k])) ||
+        v.strength<0 || v.strength>100 || v.priceUsd<=0 || !Array.isArray(v.factors) || v.factors.some(f=>!f || typeof f.label!=='string')) {
+      result[kind] = null; result.unavailable[kind] = typeof result.unavailable[kind] === 'string' ? result.unavailable[kind] : '유효한 코인 자료를 기다리는 중입니다.';
+    }
+  }
+  for (const kind of coins) {
+    const p = result[kind]?.tradePlan;
+    if (p && (!['entry','stop','target1','target2','fx','riskPct','atr14'].every(k=>Number.isFinite(p[k]) && p[k]>0) ||
+       !(p.stop<p.entry && p.entry<p.target1 && p.target1<p.target2) || !validDate(p.asOf) || !validDate(p.fxAsOf) || !validDate(p.volatilityAsOf) || !Number.isFinite(Date.parse(p.calculatedAt)))) {
+      result[kind] = {...result[kind],tradePlan:null};
+    }
+  }
+  const seen = new Set();
+  result.ranking = (Array.isArray(payload.ranking)?payload.ranking:[]).filter(row=>{
+    if (!row || !coins.includes(row.asset) || seen.has(row.asset) || !result[row.asset] || !Number.isInteger(row.rank) || row.rank<1 ||
+        !Number.isFinite(row.score) || row.score<0 || row.score>100 || !Array.isArray(row.reasons) || row.reasons.some(r=>typeof r!=='string')) return false;
+    seen.add(row.asset);return true;
+  }).sort((a,b)=>a.rank-b.rank);
+  return result;
 }
 export function staleSignal(payload, now = Date.now()) {
   return (
