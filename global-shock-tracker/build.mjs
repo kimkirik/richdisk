@@ -20,9 +20,14 @@ const data = write(
   readFileSync(join(root, "src/data.mjs"), "utf8"),
   "mjs",
 );
+const alerts = write("signal-alerts-v3", readFileSync(join(root, "signal-alerts.js"), "utf8"), "js");
+const center = write("signal-center-v3", readFileSync(join(root, "signal-center.js"), "utf8")
+  .replace("./signal-alerts.js", `./${alerts}`)
+  .replace("./signal-data.mjs", `./${data}`), "js");
 const app = write(
   "app-v2",
   readFileSync(join(root, "src/app.js"), "utf8")
+    .replace("../signal-center.js", `./${center}`)
     .replaceAll("../assets/", "./")
     .replace("./data.mjs", `./${data}`),
   "js",

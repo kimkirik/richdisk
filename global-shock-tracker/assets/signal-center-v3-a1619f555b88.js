@@ -1,5 +1,5 @@
-import './signal-alerts.js';
-import { fetchJson, validateSignals, safeStorage, formatChecked } from './signal-data.mjs';
+import './signal-alerts-v3-6f3bf2f299e6.js';
+import { fetchJson, validateSignals, safeStorage, formatChecked } from './data-v2-01fcbebef09c.mjs';
 const A = globalThis.ShockAlerts;
 const TABS = A.KINDS.filter(k => k !== 'recommendation');
 const storage = safeStorage(() => window.localStorage);
