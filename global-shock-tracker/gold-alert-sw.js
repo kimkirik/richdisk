@@ -34,3 +34,23 @@ self.addEventListener('notificationclick', event => {
 });
 self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+
+// Encrypted Web Push wakes the worker even when no page is open.
+self.addEventListener('push', event => {
+  event.waitUntil((async () => {
+    let message;try {message=event.data?.json();}catch{}
+    const base=self.registration.scope;
+    const safe=message?.version===1 && (ShockAlerts.KINDS.includes(message.kind) || message.kind==='test') && typeof message.title==='string' && typeof message.body==='string';
+    const title=safe?message.title.slice(0,160):'투자 신호 알림';
+    const body=safe?message.body.slice(0,2600):'사이트에서 최신 신호와 알림 연결 상태를 확인해주세요.';
+    let url=new URL('#gold-signal',base);
+    if(safe)try{const target=new URL(message.url);if(target.origin===url.origin && target.pathname.startsWith(new URL(base).pathname))url=target;}catch{}
+    const cache=await caches.open(ShockAlerts.CACHE);
+    const id=safe && typeof message.id==='string' ? message.id.slice(0,250) : String(Date.now());
+    const receipt=new URL('__market_signal_last_push__',base).toString();
+    const previous=await cache.match(receipt);let last;try{last=await previous?.json();}catch{}
+    if(last?.id===id)return;
+    await self.registration.showNotification(title,{body,icon:new URL('shockwave-app-icon-192.png',base).toString(),badge:new URL('shockwave-app-icon-192.png',base).toString(),tag:`shock-push-${safe?message.kind:'notice'}`,data:{url:url.toString()},renotify:true});
+    await cache.put(receipt,new Response(JSON.stringify({id,at:new Date().toISOString(),title})));
+  })());
+});

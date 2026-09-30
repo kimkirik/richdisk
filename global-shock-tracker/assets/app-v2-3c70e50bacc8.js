@@ -1,4 +1,4 @@
-import { createSignalCenter } from "./signal-center-v3-fb8b2e1f2634.js";
+import { createSignalCenter } from "./signal-center-v3-9c15d7b9c031.js";
 // Recovered application source from the existing deployment; vendor modules are preserved.
 import {
   fetchJson,

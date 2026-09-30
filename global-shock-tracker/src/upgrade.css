@@ -266,3 +266,6 @@
     max-width: 140px;
   }
 }
+
+/* Account for narrow viewports with a reserved scrollbar. */
+body,.shock-shell{min-width:0}

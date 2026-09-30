@@ -1,13 +1,13 @@
 /* Shared by the page and the service worker so each device uses one alert history. */
 (function (root) {
   const COINS = ['btc', 'xrp', 'sol', 'eth', 'doge'];
-  const NAMES = { gold: '금', btc: 'BTC', xrp: 'XRP', sol: '솔라나 SOL', eth: '이더리움 ETH', doge: '도지코인 DOGE', cash: '현금방어', recommendation: '추천 순위' };
-  const KINDS = ['gold', ...COINS, 'cash', 'recommendation'];
+  const NAMES = { gold: '금', btc: 'BTC', xrp: 'XRP', sol: '솔라나 SOL', eth: '이더리움 ETH', doge: '도지코인 DOGE', cash: '현금방어', recommendation: '추천 순위', daily: '매일 오전 9시 요약' };
+  const KINDS = ['gold', ...COINS, 'cash', 'recommendation', 'daily'];
   const CACHE = 'global-shock-tracker-market-alert-v3';
   function fresh(payload, kind, now = Date.now()) {
     const fetched = Date.parse(payload?.fetchedAt);
     if (payload?.status !== 'ok' || !Number.isFinite(fetched) || now - fetched > 30 * 60000 || fetched - now > 5 * 60000) return false;
-    const signal = payload[kind === 'recommendation' ? 'cash' : kind];
+    const signal = payload[['recommendation','daily'].includes(kind) ? 'cash' : kind];
     const date = signal?.asOf;
     if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
     const observed = Date.parse(date + 'T23:59:59Z');
@@ -44,38 +44,49 @@
       seen.add(row.asset); return true;
     }).sort((a,b) => a.rank - b.rank).slice(0,3);
   }
+  function koreaDay(now = Date.now()) { return new Date(now + 9 * 3600000).toISOString().slice(0,10); }
+  function dailyDue(now = Date.now()) { return new Date(now + 9 * 3600000).getUTCHours() >= 9; }
   function details(kind, payload, now = Date.now()) {
+    if (kind === 'daily') {
+      const rows = candidates(payload, now);
+      const current = fresh(payload, 'daily', now);
+      const overview = ['gold',...COINS,'cash'].map(k => `${NAMES[k]}: ${fresh(payload,k,now) ? payload[k]?.label ?? '자료 대기' : '자료 지연'}`).join(' · ');
+      return {triggered: dailyDue(now), key: koreaDay(now), title: `오늘의 투자 신호 · ${koreaDay(now)}`,
+        body: current ? `${overview}\n${rows.length ? details('recommendation',payload,now).body : '추천 보류 · 지금은 매수 조건을 통과한 코인이 없습니다.'}` : '시장 자료 갱신 지연 · 오늘의 추천과 가격 안내를 보류합니다. 사이트에서 연결 상태를 확인해주세요.'};
+    }
     if (kind === 'recommendation') {
       const rows = candidates(payload, now);
-      return { triggered: rows.length > 0, key: rows.map(row => row.asset).join('>'),
-        title: '코인 상승 조건 · 추천 순위',
-        body: rows.map((row, i) => `${i+1}. ${NAMES[row.asset]} ${row.score}점 — ${prices(payload[row.asset])}`).join('\n') + `\n시세 기준 ${payload[rows[0]?.asset]?.asOf ?? '—'} UTC · 1코인 원화 환산\n${fxNote(payload[rows[0]?.asset])} · 손익비 1:2 / 1:3 · 확률 아님` };
+      return { triggered: fresh(payload,kind,now), key: rows.map(row => row.asset).join('>') || 'hold',
+        title: rows.length ? '코인 상승 조건 · 추천 순위' : '코인 추천 · 관망으로 전환',
+        body: rows.length ? rows.map((row, i) => `${i+1}. ${NAMES[row.asset]} ${row.score}점 — ${prices(payload[row.asset])}`).join('\n') + `\n시세 기준 ${payload[rows[0]?.asset]?.asOf ?? '—'} UTC · 1코인 원화 환산\n${fxNote(payload[rows[0]?.asset])} · 손익비 1:2 / 1:3 · 확률 아님` : '시장 위험, 신호 점수 또는 가격 자료 조건 때문에 추천을 보류합니다. 신규 매수 신호가 아닙니다.' };
     }
     const signal = payload?.[kind];
-    return { triggered: !!signal && fresh(payload, kind, now) && (!COINS.includes(kind) || (validPlan(signal.tradePlan, now) && fresh(payload, 'cash', now) && !['high','cash-first'].includes(payload.cash?.level))) && (kind === 'cash' ? ['high','cash-first'] : ['buy','strong-buy']).includes(signal.level),
-      key: signal?.level ?? '', title: `${NAMES[kind]} 신호 · ${signal?.label ?? '자료 대기'}`,
-      body: kind === 'cash' ? signal?.summary ?? '' : COINS.includes(kind) ? `${prices(signal)}\n시세 기준 ${signal.asOf} UTC · 1코인 원화 환산\n${fxNote(signal)} · 손익비 1:2 / 1:3 · 전략 참고값` : `${signal?.strength ?? '—'}점 — ${signal?.summary ?? ''}` };
+    const coin = COINS.includes(kind);
+    const blocked = coin && (!fresh(payload,'cash',now) || ['high','cash-first'].includes(payload.cash?.level));
+    const planOk = coin && validPlan(signal?.tradePlan, now);
+    return { triggered: !!signal && fresh(payload, kind, now),
+      key: `${signal?.level ?? ''}${coin ? `:${blocked ? 'risk' : 'clear'}:${planOk ? 'plan' : 'no-plan'}` : ''}`,
+      title: `${NAMES[kind]} 신호 · ${blocked ? '매수 보류' : signal?.label ?? '자료 대기'}`,
+      body: coin ? `${blocked ? '시장 위험으로 신규 매수 보류' : signal?.summary ?? ''}\n${!blocked && planOk ? prices(signal) : '매수·손절·매도 가격 안내 보류'}\n시세 기준 ${signal?.asOf ?? '—'} UTC · 1코인 원화 환산\n${planOk ? fxNote(signal) : ''} · 전략 참고값` : `${signal?.strength ?? '—'}점 — ${signal?.summary ?? ''}` };
   }
   function targetUrl(base, kind) {
     const url = new URL(base); url.searchParams.set('signal', kind);
     url.hash = kind === 'recommendation' ? 'crypto-ranking' : 'gold-signal'; return url.toString();
   }
-  function cooldown(kind) { return kind === 'recommendation' ? 86400000 : COINS.includes(kind) ? 14 * 86400000 : 0; }
   async function send(kind, payload, registration, base) {
-    if (!KINDS.includes(kind) || !fresh(payload, kind)) return false;
+    if (!KINDS.includes(kind)) return false;
     const check = async () => {
       const cache = await caches.open(CACHE);
       const url = suffix => new URL(suffix, base).toString();
+      if (await cache.match(url('__market_signal_push_active__'))) return false;
       const enabled = await cache.match(url(`__market_signal_alert_enabled__/${kind}`));
       if (!enabled || await enabled.text() !== 'on') return false;
       const data = details(kind, payload);
       const state = url(`__market_signal_alert_state__/${kind}`);
-      if (!data.triggered) { await cache.delete(state); return false; }
+      if (!data.triggered) return false;
       const prior = await cache.match(state);
       if (prior && await prior.text() === data.key) return false;
       const clock = url(`__market_signal_alert_cooldown__/${kind}`);
-      const previous = await cache.match(clock);
-      if (previous && Date.now() - Number(await previous.text()) < cooldown(kind)) return false;
       await registration.showNotification(data.title, { body: data.body,
         icon: url('shockwave-app-icon-192.png'), badge: url('shockwave-app-icon-192.png'),
         tag: `market-${kind}-signal`, data: { url: targetUrl(base, kind) } });
@@ -85,5 +96,5 @@
     };
     return root.navigator?.locks?.request ? root.navigator.locks.request(`shock-alert:${base}:${kind}`, check) : check();
   }
-  root.ShockAlerts = { COINS, KINDS, NAMES, CACHE, fresh, validPlan, price, won, fxNote, prices, candidates, details, targetUrl, send };
+  root.ShockAlerts = { COINS, KINDS, NAMES, CACHE, fresh, validPlan, price, won, fxNote, prices, candidates, koreaDay, dailyDue, details, targetUrl, send };
 })(globalThis);

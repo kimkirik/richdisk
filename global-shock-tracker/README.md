@@ -43,3 +43,13 @@ node --test global-shock-tracker/tests/*.test.mjs
 ## 원화 우선 표시
 
 추천 순위·개별 코인 알림의 매수가, 손절가, 1차/2차 매도 목표가는 적용 USD/KRW 환율로 환산해 원 단위로 반올림하고 쉼표를 넣습니다. 화면은 원화가 큰 글씨이며 달러 원가는 아래에 보조 표시합니다. 카드와 알림 모두 적용 환율 및 환율 기준일을 표시합니다. 원화 환산값은 국내 거래소의 실제 호가가 아닙니다.
+
+## 2026-09-30: Android background notifications (supersedes old cooldown rules)
+
+A dedicated Cloudflare Worker checks signals every 15 minutes and sends Web Push to registered devices even when the page is closed. Daily summaries are due at 09:00 Asia/Seoul regardless of unchanged rankings. Gold, BTC, XRP, SOL, ETH, DOGE, cash-defense and ranking transitions have no 24-hour/14-day cooldown. Stale prices are withheld; summaries explain data delays or a hold condition. All coin entry, stop and target prices are KRW conversions with their FX date.
+
+On Android, open the app in Chrome, choose the all-notifications button, allow browser notifications, then send a test notification. Registration is device- and origin-specific; use either the original Sites address or this mirror. The UI distinguishes push-service acceptance from this device receiving a message. Actual phone display still depends on its network, Chrome notification and power settings.
+
+Device registrations and hashed management tokens are stored in a dedicated D1 database. The server prevents overlapping runs, retries failed delivery and removes expired subscriptions. notification-config.json contains only the public server origin; never commit private keys or subscription credentials.
+
+Validation: 7 notification-server tests including real Workers encryption/D1; 15 frontend/data tests; 12 strategy/render/UI tests; production build and TypeScript passed. Actual phone receipt requires registering that phone.
