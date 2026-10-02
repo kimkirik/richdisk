@@ -1,4 +1,4 @@
-const CACHE_NAME = "neon-bubble-pop-v2";
+const CACHE_NAME = "neon-bubble-pop-v3";
 const APP_BASE = "/richdisk/neon-bubble-pop/";
 const CORE_ASSETS = [
   APP_BASE,
