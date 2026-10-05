@@ -1,0 +1,16 @@
+# Python 3.10–3.12. Keep torch/torchaudio paired; Demucs 4 predates torch 2.6's
+# weights_only default change and torchaudio 2.9's codec API changes.
+torch==2.5.1
+setuptools==80.9.0
+torchaudio==2.5.1
+demucs==4.0.1
+numpy==1.26.4
+scipy==1.13.1
+librosa==0.11.0
+soundfile==0.13.1
+pretty_midi==0.2.10
+fastapi==0.115.12
+uvicorn==0.34.3
+python-multipart==0.0.20
+imageio-ffmpeg==0.6.0
+adtof-pytorch @ git+https://github.com/xavriley/ADTOF-pytorch.git@85c192e78f716ea0b111cc8a5ee4a8f6a3a4f8a9

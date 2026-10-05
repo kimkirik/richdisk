@@ -4,6 +4,8 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 const INSTRUMENTS = [
+  { id: "cymbal", short: "CY", name: "심벌 (종류 확인)", midi: 49, mark: "cross", staffY: 42, displayStep: "A", displayOctave: 5, voice: "upper" },
+  { id: "tom", short: "TM", name: "탐 (높이 확인)", midi: 47, mark: "circle", staffY: 68, displayStep: "D", displayOctave: 5, voice: "upper" },
   { id: "crash", short: "CR", name: "크래시", midi: 49, mark: "cross", staffY: 42, displayStep: "A", displayOctave: 5, voice: "upper" },
   { id: "openHat", short: "OH", name: "오픈 하이햇", midi: 46, mark: "open-cross", staffY: 48.5, displayStep: "G", displayOctave: 5, voice: "upper" },
   { id: "hat", short: "HH", name: "하이햇", midi: 42, mark: "cross", staffY: 48.5, displayStep: "G", displayOctave: 5, voice: "upper" },
@@ -18,7 +20,7 @@ const INSTRUMENTS = [
 const DIFFICULTY_HELP = {
   easy: "큰 박자 중심으로 단순화해 처음 연습하기 좋게 만듭니다.",
   standard: "불확실한 타격과 지나치게 촘촘한 음을 정리합니다.",
-  exact: "감지된 작은 타격까지 최대한 많이 표시합니다.",
+  exact: "감지한 타격을 모두 표시합니다. 16분음표보다 촘촘한 연주는 연주 MIDI로 보존합니다.",
 };
 
 const ui = {
@@ -73,6 +75,21 @@ const ui = {
   helpButton: $("#helpButton"),
   helpDialog: $("#helpDialog"),
   toast: $("#toast"),
+  analysisMode: $("#analysisMode"),
+  enginePanel: $("#enginePanel"),
+  engineStatus: $("#engineStatus"),
+  connectEngine: $("#connectEngine"),
+  inputIsDrums: $("#inputIsDrums"),
+  quickIsolation: $("#quickIsolation"),
+  bpmModeLabel: $("#bpmModeLabel"),
+  gridOffset: $("#gridOffset"),
+  cancelAnalysis: $("#cancelAnalysis"),
+  analysisReport: $("#analysisReport"),
+  stemControls: $("#stemControls"),
+  listenOriginal: $("#listenOriginal"),
+  listenDrums: $("#listenDrums"),
+  downloadStem: $("#downloadStem"),
+  exportPerformance: $("#exportPerformance"),
 };
 
 const state = {
@@ -88,7 +105,7 @@ const state = {
   totalSteps: 0,
   sensitivity: 62,
   drumIsolation: true,
-  difficulty: "standard",
+  difficulty: "exact",
   selectedInstrument: "hat",
   editing: true,
   metronome: false,
@@ -101,7 +118,141 @@ const state = {
   audioContext: null,
   barsPerSystem: 0,
   printing: false,
+  audioBlob: null,
+  loadVersion: 0,
+  analysisMode: "pro",
+  bpmManual: false,
+  gridOffset: 0,
+  gridTimes: null,
+  proResult: null,
+  stemBlob: null,
+  stemUrl: "",
+  activeSource: "original",
+  currentJob: null,
+  cancelRequested: false,
+  removedAiHits: new Set(),
+  workspaceId: "",
+  jobStage: "idle",
+  restoring: false,
 };
+
+let workspaceWrites = Promise.resolve();
+let storageWarningShown = false;
+function storageWarning(error) {
+  console.warn("Workspace save unavailable", error);
+  if (!storageWarningShown) {
+    showToast("기기 저장 공간이 부족해 음원 자동 복구가 제한됩니다. 맥의 분석 작업은 계속됩니다.");
+    storageWarningShown = true;
+  }
+}
+
+function workspaceSnapshot() {
+  return { id: state.workspaceId, jobId: state.currentJob, stage: state.jobStage,
+    fileName: state.fileName, fileSize: state.fileSize, updatedAt: Date.now(),
+    project: projectData(), options: { inputIsDrums: ui.inputIsDrums.checked,
+      sensitivity: state.sensitivity, bpm: state.bpmManual ? state.bpm : null },
+    analysisMode: state.analysisMode, playbackTime: ui.audio.currentTime || 0,
+    activeSource: state.activeSource };
+}
+
+function saveWorkspace() {
+  if (state.restoring || !state.workspaceId) return Promise.resolve();
+  const snapshot = workspaceSnapshot();
+  try { DrumWorkspace.remember(snapshot); } catch (error) { storageWarning(error); }
+  workspaceWrites = workspaceWrites.catch(() => {}).then(() => DrumWorkspace.save(snapshot)).catch(storageWarning);
+  return workspaceWrites;
+}
+
+async function attachStem(stem) {
+  if (state.stemUrl) URL.revokeObjectURL(state.stemUrl);
+  state.stemBlob = stem;
+  state.stemUrl = URL.createObjectURL(stem);
+  ui.stemControls.classList.remove("is-hidden");
+  ui.listenOriginal.disabled = !state.audioBlob;
+  if (!state.audioBlob) {
+    state.audioBuffer = await getAudioContext().decodeAudioData(await stem.arrayBuffer());
+    drawWaveform(state.audioBuffer);
+    updateTrackMeta();
+    ui.waveEmpty.classList.add("is-hidden");
+    await selectAudioSource("drums");
+    for (const control of [ui.playButton, ui.stopButton, ui.scorePlayButton, ui.scoreStopButton]) control.disabled = false;
+  }
+}
+
+async function restoreWorkspace() {
+  if (state.restoring || state.analyzing) return;
+  state.restoring = true;
+  setAnalysisBusy(true);
+  try {
+    let snapshot = await DrumWorkspace.load();
+    if (!snapshot) {
+      // Also recover work submitted by the old version, or from another tab
+      // with no local handle. This endpoint is restricted to the owner.
+      const { job } = await DrumPro.latest().catch(() => ({ job: null }));
+      if (job && ["uploading", "queued", "running", "completed"].includes(job.state)) {
+        snapshot = { id: crypto.randomUUID(), jobId: job.id, stage: "running",
+          fileName: job.title || "진행 중이던 음악", options: job.options, fileSize: 0 };
+      } else {
+        const oldProject = JSON.parse(localStorage.getItem("drumscore:last-project") || "null");
+        if (oldProject?.totalSteps) snapshot = { id: crypto.randomUUID(), stage: "completed", project: oldProject };
+      }
+    }
+    if (!snapshot) return;
+    state.workspaceId = snapshot.id;
+    let original;
+    try { original = await DrumWorkspace.media(snapshot.id, "original"); } catch {}
+    if (original) await loadAudioBlob(original, snapshot.fileName || "저장한 음악", snapshot.fileSize, true);
+    state.workspaceId = snapshot.id;
+    state.currentJob = snapshot.jobId || null;
+    state.jobStage = snapshot.stage || "idle";
+    if (snapshot.project?.totalSteps) loadProjectData(snapshot.project, snapshot.fileName, true);
+    else {
+      state.fileName = snapshot.fileName || "이전 채보 작업";
+      state.fileSize = snapshot.fileSize || 0;
+      state.bpmManual = snapshot.options?.bpm != null;
+      state.bpm = snapshot.options?.bpm || snapshot.project?.bpm || 120;
+      state.sensitivity = snapshot.options?.sensitivity || 62;
+      state.timeSignature = snapshot.project?.timeSignature || "4/4";
+      ui.bpmInput.value = String(state.bpm);
+      ui.timeSignature.value = state.timeSignature;
+      ui.sensitivity.value = String(state.sensitivity);
+      ui.sensitivityValue.textContent = `${state.sensitivity}%`;
+    }
+    state.fileName = snapshot.fileName || state.fileName;
+    state.fileSize = snapshot.fileSize || 0;
+    state.analysisMode = snapshot.analysisMode || "pro";
+    ui.analysisMode.value = state.analysisMode;
+    ui.enginePanel.classList.toggle("is-hidden", state.analysisMode !== "pro");
+    ui.quickIsolation.classList.toggle("is-hidden", state.analysisMode === "pro");
+    ui.inputIsDrums.checked = snapshot.options?.inputIsDrums === true;
+    ui.trackName.textContent = state.fileName;
+    ui.uploadPanel.classList.add("is-hidden");
+    ui.workspace.classList.remove("is-hidden");
+    updateBpmModeLabel();
+    let stem;
+    if (state.jobStage === "completed") {
+      try { stem = await DrumWorkspace.media(snapshot.id, "drums"); } catch {}
+      if (stem) await attachStem(stem);
+    }
+    state.restoring = false;
+    if (state.currentJob && (["uploading", "running"].includes(state.jobStage) ||
+        (state.jobStage === "completed" && !stem))) {
+      await runAnalysis({ resume: true, preserveScore: state.jobStage === "completed" && !!state.proResult });
+    } else {
+      if (snapshot.activeSource === "drums" && stem) await selectAudioSource("drums");
+      if (snapshot.playbackTime && ui.audio.readyState >= 1) ui.audio.currentTime = snapshot.playbackTime;
+      showToast("이전 음악과 작업 상태를 자동으로 복구했어요.");
+    }
+    await saveWorkspace();
+  } catch (error) {
+    console.warn("Workspace restoration", error);
+    showToast(error.message || "이전 작업 연결을 확인해 주세요.");
+  } finally {
+    state.restoring = false;
+    if (!state.analyzing) setAnalysisBusy(false);
+    ui.analyzeButton.disabled = state.analyzing || !state.audioBlob;
+  }
+}
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -162,6 +313,7 @@ function addEvent(step, instrument, confidence = 1, source = "manual") {
     instrument,
     confidence: clamp(confidence, 0, 1),
     source,
+    ...(source === "manual" && state.gridTimes ? { time: state.gridTimes[step] } : {}),
   });
 }
 
@@ -176,6 +328,7 @@ function hasEvent(step, instrument) {
 function eventIsVisible(event) {
   if (!event) return false;
   if (event.source === "manual") return true;
+  if (event.source === "ai" && state.difficulty === "exact") return true;
   const info = signatureInfo();
   if (state.difficulty === "exact") return event.confidence >= 0.28;
   if (state.difficulty === "standard") return event.confidence >= 0.45;
@@ -231,7 +384,8 @@ function resetPlayback(showMessage = false) {
 }
 
 async function loadAudioFile(file) {
-  const extensionOkay = /\.(mp3|wav|m4a|aac)$/i.test(file.name);
+  if (state.analyzing || state.restoring) return;
+  const extensionOkay = /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name);
   if (!file.type.startsWith("audio/") && !extensionOkay) {
     showToast("MP3, WAV, M4A 오디오 파일을 선택해 주세요.");
     return;
@@ -246,8 +400,23 @@ async function loadAudioFile(file) {
   await loadAudioBlob(file, file.name, file.size);
 }
 
-async function loadAudioBlob(blob, name, size = blob.size) {
+async function loadAudioBlob(blob, name, size = blob.size, restoring = false) {
+  if (state.analyzing) return;
+  if (!restoring) {
+    state.workspaceId = crypto.randomUUID();
+    state.currentJob = null;
+    state.jobStage = "idle";
+    ui.engineStatus.textContent = "음악 준비 중 · 분석을 시작하면 맥에서 계속 처리합니다";
+  }
+  const loadVersion = ++state.loadVersion;
+  const workspaceId = state.workspaceId;
   resetPlayback();
+  clearProResult();
+  state.audioBlob = blob;
+  state.bpmManual = false;
+  state.gridOffset = 0;
+  ui.gridOffset.value = "0";
+  updateBpmModeLabel();
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   state.objectUrl = URL.createObjectURL(blob);
   ui.audio.src = state.objectUrl;
@@ -276,6 +445,7 @@ async function loadAudioBlob(blob, name, size = blob.size) {
     const arrayBuffer = await blob.arrayBuffer();
     const ctx = getAudioContext();
     const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    if (loadVersion !== state.loadVersion) return;
     if (decoded.duration > 12 * 60 + 1) {
       throw new Error("12분을 넘는 곡은 아직 분석할 수 없어요.");
     }
@@ -288,11 +458,128 @@ async function loadAudioBlob(blob, name, size = blob.size) {
     ui.stopButton.disabled = false;
     ui.scorePlayButton.disabled = false;
     ui.scoreStopButton.disabled = false;
+    if (!restoring) {
+      await saveWorkspace();
+      await DrumWorkspace.putMedia(workspaceId, "original", blob).catch(storageWarning);
+    }
+    if (loadVersion !== state.loadVersion) return;
     showToast("곡을 준비했어요. ‘드럼 악보 만들기’를 눌러 주세요.");
   } catch (error) {
+    if (loadVersion !== state.loadVersion) return;
     console.error(error);
     ui.trackDetails.textContent = "파일을 읽지 못했어요";
     showToast(error.message || "이 오디오 형식은 브라우저에서 열 수 없어요.");
+  }
+}
+
+function clearProResult() {
+  if (state.stemUrl) URL.revokeObjectURL(state.stemUrl);
+  state.stemUrl = "";
+  state.stemBlob = null;
+  state.activeSource = "original";
+  state.proResult = null;
+  state.removedAiHits.clear();
+  state.gridTimes = null;
+  ui.stemControls.classList.add("is-hidden");
+  ui.analysisReport.classList.add("is-hidden");
+  ui.exportPerformance.disabled = true;
+  ui.listenOriginal.classList.add("active");
+  ui.listenDrums.classList.remove("active");
+  ui.listenOriginal.setAttribute("aria-pressed", "true");
+  ui.listenOriginal.disabled = false;
+  ui.listenDrums.setAttribute("aria-pressed", "false");
+  ui.scoreCurrentTime.parentElement.firstChild.textContent = "원곡 ";
+}
+
+function updateBpmModeLabel() {
+  ui.bpmModeLabel.textContent = state.bpmManual
+    ? `BPM 수동 · ${state.bpm} BPM을 유지합니다.`
+    : "BPM 자동 · AI가 분리된 드럼에서 박자를 찾습니다.";
+  if (!state.bpmManual && state.proResult && !state.proResult.bpm) {
+    ui.bpmModeLabel.textContent = "BPM 미검출 · 현재 값은 임시 박자입니다. 직접 맞춰 주세요.";
+  }
+}
+
+async function connectEngine() {
+  ui.connectEngine.disabled = true;
+  ui.engineStatus.textContent = "엔진을 확인하고 있어요…";
+  try {
+    const health = await DrumPro.connect();
+    ui.engineStatus.textContent = health.busy ? "연결됨 · 다른 분석 진행 중" : "연결됨 · AI 분석 준비 완료";
+    return true;
+  } catch (error) {
+    ui.engineStatus.textContent = "연결 안 됨 · 맥의 실행 상태와 두 기기의 Tailscale 연결을 확인해 주세요.";
+    return false;
+  } finally { ui.connectEngine.disabled = false; }
+}
+
+function requantizeProResult() {
+  if (!state.proResult) return;
+  const result = state.proResult;
+  const manualEvents = [...state.events.values()].filter(e => e.source === "manual" && Number.isFinite(e.time));
+  const beats = state.bpmManual ? [] : result.beatTimes;
+  state.gridTimes = DrumTiming.buildGrid(result.duration, state.bpm, beats, state.gridOffset);
+  state.gridStart = state.gridTimes[0];
+  state.totalSteps = state.gridTimes.length;
+  const mapped = DrumTiming.quantize(result.events.filter(e => !state.removedAiHits.has(`${e.time}:${e.instrument}`)), state.gridTimes);
+  state.events = new Map(mapped.events.map(event => [eventKey(event.step, event.instrument), event]));
+  for (const event of manualEvents) {
+    const step = DrumTiming.nearestStep(state.gridTimes, event.time);
+    state.events.set(eventKey(step, event.instrument), { ...event, step });
+  }
+  const messages = [
+    `AI 검출 원본 ${result.events.length}타격 · 16분음표 악보 ${mapped.events.length}타격 · 탐/심벌의 세부 종류는 직접 확인해 주세요.`,
+    ...(result.warnings || []),
+  ];
+  if (mapped.collisions) messages.push(`${mapped.collisions}타격이 같은 악보 칸에 겹칩니다. 빠른 연타는 연주 MIDI에서 모두 유지됩니다.`);
+  if (mapped.offGrid) messages.push(`${mapped.offGrid}타격의 위치 확인이 필요합니다. 스윙·셋잇단음표·템포/박자 위치 차이일 수 있습니다.`);
+  ui.analysisReport.replaceChildren(...messages.map(message => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = message;
+    return paragraph;
+  }));
+  ui.analysisReport.classList.remove("is-hidden");
+  ui.exportPerformance.disabled = false;
+}
+
+function setAnalysisBusy(busy) {
+  for (const control of [ui.audioFile, ui.projectFile, ui.demoButton, ui.analysisMode,
+    ui.inputIsDrums, ui.bpmInput, ui.detectBpmButton, ui.gridOffset, ui.timeSignature,
+    ui.sensitivity, ui.drumIsolation, ui.connectEngine]) control.disabled = busy;
+  ui.cancelAnalysis.classList.toggle("is-hidden", !busy || state.analysisMode !== "pro");
+  ui.cancelAnalysis.disabled = false;
+  if (!busy) ui.gridOffset.disabled = state.analysisMode !== "pro";
+}
+
+async function selectAudioSource(source) {
+  const url = source === "drums" ? state.stemUrl : state.objectUrl;
+  if (!url || state.activeSource === source) return;
+  const time = ui.audio.currentTime || 0;
+  const playing = !ui.audio.paused;
+  ui.audio.pause();
+  const ready = new Promise((resolve, reject) => {
+    const cleanup = () => { ui.audio.removeEventListener("loadedmetadata", loaded); ui.audio.removeEventListener("error", failed); };
+    const loaded = () => { cleanup(); resolve(); };
+    const failed = () => { cleanup(); reject(new Error("오디오를 재생하지 못했습니다.")); };
+    ui.audio.addEventListener("loadedmetadata", loaded, { once: true });
+    ui.audio.addEventListener("error", failed, { once: true });
+  });
+  ui.audio.src = url;
+  ui.audio.load();
+  await ready;
+  ui.audio.currentTime = Math.min(time, ui.audio.duration || time);
+  state.activeSource = source;
+  saveWorkspace();
+  for (const [button, active] of [[ui.listenOriginal, source === "original"], [ui.listenDrums, source === "drums"]]) {
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  ui.scoreCurrentTime.parentElement.firstChild.textContent = source === "drums" ? "드럼 " : "원곡 ";
+  updatePlayhead();
+  if (playing) {
+    await ui.audio.play();
+    setPlaybackUi(true);
+    state.animationFrame = requestAnimationFrame(animationLoop);
   }
 }
 
@@ -341,8 +628,10 @@ function drawWaveform(buffer) {
 
 function computeEnvelopes(buffer, onProgress) {
   const sampleRate = buffer.sampleRate;
-  const hop = 1024;
-  const sampleStride = sampleRate > 48000 ? 3 : 2;
+  // 512 samples is about 11.6 ms at 44.1 kHz. The old 1024-sample hop
+  // regularly put fast 16th notes in the wrong score cell.
+  const hop = 512;
+  const sampleStride = sampleRate > 64000 ? 2 : 1;
   const frameCount = Math.ceil(buffer.length / hop);
   const total = new Float32Array(frameCount);
   const low = new Float32Array(frameCount);
@@ -351,12 +640,10 @@ function computeEnvelopes(buffer, onProgress) {
   const channels = [];
   for (let c = 0; c < buffer.numberOfChannels; c += 1) channels.push(buffer.getChannelData(c));
 
-  const aLow = 1 - Math.exp((-2 * Math.PI * 190) / sampleRate);
-  const aMid = 1 - Math.exp((-2 * Math.PI * 1550) / sampleRate);
-  const aHigh = 1 - Math.exp((-2 * Math.PI * 5200) / sampleRate);
-  let lowState = 0;
-  let midState = 0;
-  let highState = 0;
+  const aLow = 1 - Math.exp((-2 * Math.PI * 180) / sampleRate);
+  const aMid = 1 - Math.exp((-2 * Math.PI * 2800) / sampleRate);
+  const aHigh = 1 - Math.exp((-2 * Math.PI * 4200) / sampleRate);
+  const filterStates = channels.map(() => ({ low: 0, mid: 0, high: 0 }));
 
   for (let frame = 0; frame < frameCount; frame += 1) {
     const start = frame * hop;
@@ -367,20 +654,23 @@ function computeEnvelopes(buffer, onProgress) {
     let sumHigh = 0;
     let count = 0;
     for (let i = start; i < end; i += sampleStride) {
-      let x = 0;
-      for (const channel of channels) x += channel[i] || 0;
-      x /= channels.length;
-      lowState += aLow * (x - lowState);
-      midState += aMid * (x - midState);
-      highState += aHigh * (x - highState);
-      const lowBand = lowState;
-      const midBand = midState - lowState;
-      const highBand = x - highState;
-      sumTotal += x * x;
-      sumLow += lowBand * lowBand;
-      sumMid += midBand * midBand;
-      sumHigh += highBand * highBand;
-      count += 1;
+      for (let channelIndex = 0; channelIndex < channels.length; channelIndex += 1) {
+        const x = channels[channelIndex][i] || 0;
+        const filter = filterStates[channelIndex];
+        filter.low += aLow * (x - filter.low);
+        filter.mid += aMid * (x - filter.mid);
+        filter.high += aHigh * (x - filter.high);
+        const lowBand = filter.low;
+        const midBand = filter.mid - filter.low;
+        const highBand = x - filter.high;
+        // Accumulate channels as energy instead of summing samples first. This
+        // avoids losing drums in wide or phase-shifted stereo masters.
+        sumTotal += x * x;
+        sumLow += lowBand * lowBand;
+        sumMid += midBand * midBand;
+        sumHigh += highBand * highBand;
+        count += 1;
+      }
     }
     total[frame] = Math.sqrt(sumTotal / Math.max(1, count));
     low[frame] = Math.sqrt(sumLow / Math.max(1, count));
@@ -392,10 +682,14 @@ function computeEnvelopes(buffer, onProgress) {
   const flux = (source) => {
     const result = new Float32Array(source.length);
     let rolling = source[0] || 0;
+    let previous = source[0] || 0;
     for (let i = 1; i < source.length; i += 1) {
-      rolling = rolling * 0.9 + source[i - 1] * 0.1;
-      const rise = Math.max(0, source[i] - rolling * 0.98);
-      result[i] = Math.log1p(rise * 85);
+      rolling = rolling * 0.965 + source[i] * 0.035;
+      const fastRise = Math.max(0, source[i] - previous * 0.88);
+      const slowRise = Math.max(0, source[i] - rolling * 1.02);
+      const relativeRise = (fastRise * 0.68 + slowRise * 0.32) / Math.max(0.00002, rolling);
+      result[i] = Math.log1p(relativeRise * 3.4);
+      previous = source[i];
     }
     const smoothed = new Float32Array(result.length);
     for (let i = 1; i < result.length - 1; i += 1) {
@@ -417,6 +711,84 @@ function computeEnvelopes(buffer, onProgress) {
   };
 }
 
+function createAdaptiveThreshold(array, frameRate, percentile) {
+  // Loudness changes dramatically between verses and choruses. Measure a
+  // percentile in overlapping local windows instead of using one threshold for
+  // the entire song, then interpolate to avoid a boundary discontinuity.
+  const spacing = Math.max(16, Math.round(frameRate * 4));
+  const radius = Math.max(spacing, Math.round(frameRate * 6));
+  const points = [];
+  for (let center = 0; center < array.length + spacing; center += spacing) {
+    const values = [];
+    const start = Math.max(0, center - radius);
+    const end = Math.min(array.length, center + radius);
+    const stride = Math.max(1, Math.floor((end - start) / 1800));
+    for (let frame = start; frame < end; frame += stride) {
+      if (array[frame] > 0.00001) values.push(array[frame]);
+    }
+    values.sort((a, b) => a - b);
+    points.push(values.length
+      ? values[Math.min(values.length - 1, Math.floor(values.length * percentile))]
+      : 0.001);
+  }
+  return (frame) => {
+    const position = Math.max(0, frame) / spacing;
+    const left = Math.min(points.length - 1, Math.floor(position));
+    const right = Math.min(points.length - 1, left + 1);
+    const mix = position - left;
+    return Math.max(0.0001, points[left] * (1 - mix) + points[right] * mix);
+  };
+}
+
+function analysisFeatures(envelopes, sensitivity) {
+  const quantile = 0.955 - ((sensitivity - 35) / 50) * 0.145;
+  const thresholds = {
+    total: createAdaptiveThreshold(envelopes.total, envelopes.frameRate, clamp(quantile - 0.035, 0.72, 0.96)),
+    low: createAdaptiveThreshold(envelopes.low, envelopes.frameRate, clamp(quantile, 0.75, 0.97)),
+    mid: createAdaptiveThreshold(envelopes.mid, envelopes.frameRate, clamp(quantile, 0.75, 0.97)),
+    high: createAdaptiveThreshold(envelopes.high, envelopes.frameRate, clamp(quantile - 0.025, 0.73, 0.96)),
+  };
+  return { thresholds };
+}
+
+function onsetStrengthAt(envelopes, analysis, frame) {
+  const ratios = {};
+  for (const band of ["total", "low", "mid", "high"]) {
+    ratios[band] = peakNear(envelopes[band], frame, 1) / analysis.thresholds[band](frame);
+  }
+  ratios.combined = Math.max(ratios.total * 1.04, ratios.low, ratios.mid, ratios.high * 0.92);
+  return ratios;
+}
+
+function findOnsetCandidates(envelopes, analysis, sensitivity) {
+  const candidates = [];
+  const minimum = 0.86 - ((sensitivity - 35) / 50) * 0.14;
+  const refractoryFrames = Math.max(2, Math.round(envelopes.frameRate * 0.026));
+  let lastFrame = -refractoryFrames;
+  let lastStrength = 0;
+
+  for (let frame = 2; frame < envelopes.total.length - 2; frame += 1) {
+    const ratios = onsetStrengthAt(envelopes, analysis, frame);
+    if (ratios.combined < minimum) continue;
+    const before = onsetStrengthAt(envelopes, analysis, frame - 1).combined;
+    const after = onsetStrengthAt(envelopes, analysis, frame + 1).combined;
+    if (ratios.combined < before || ratios.combined <= after) continue;
+
+    if (frame - lastFrame < refractoryFrames) {
+      if (ratios.combined > lastStrength) {
+        candidates[candidates.length - 1] = { frame, ratios };
+        lastFrame = frame;
+        lastStrength = ratios.combined;
+      }
+      continue;
+    }
+    candidates.push({ frame, ratios });
+    lastFrame = frame;
+    lastStrength = ratios.combined;
+  }
+  return candidates;
+}
+
 function positivePercentile(array, percentile) {
   const values = [];
   const stride = Math.max(1, Math.floor(array.length / 12000));
@@ -429,11 +801,16 @@ function positivePercentile(array, percentile) {
 }
 
 function estimateBpm(envelopes) {
-  const env = envelopes.total;
+  // A weighted onset curve is much less likely than the full-band waveform to
+  // lock onto a sustained vocal or bass note.
+  const env = new Float32Array(envelopes.total.length);
+  for (let i = 0; i < env.length; i += 1) {
+    env[i] = envelopes.low[i] * 0.36 + envelopes.mid[i] * 0.34 + envelopes.high[i] * 0.2 + envelopes.total[i] * 0.1;
+  }
   const frameRate = envelopes.frameRate;
-  const threshold = positivePercentile(env, 0.7);
-  const minBpm = 68;
-  const maxBpm = 190;
+  const threshold = positivePercentile(env, 0.66);
+  const minBpm = 55;
+  const maxBpm = 210;
   const minLag = Math.floor((60 * frameRate) / maxBpm);
   const maxLag = Math.ceil((60 * frameRate) / minBpm);
   const start = Math.min(env.length - 1, Math.floor(frameRate * 2));
@@ -444,16 +821,19 @@ function estimateBpm(envelopes) {
   for (let lag = minLag; lag <= maxLag; lag += 1) {
     let score = 0;
     let weight = 0;
-    for (let i = start + lag; i < sampleLimit; i += 2) {
-      const a = Math.max(0, env[i] - threshold * 0.34);
+    for (let i = start + lag * 2; i < sampleLimit; i += 2) {
+      const a = Math.max(0, env[i] - threshold * 0.3);
       if (!a) continue;
-      const b = Math.max(0, env[i - lag] - threshold * 0.34);
-      score += a * b;
+      const oneBeat = Math.max(0, env[i - lag] - threshold * 0.3);
+      const twoBeats = Math.max(0, env[i - lag * 2] - threshold * 0.3);
+      const halfBeatIndex = i - Math.round(lag / 2);
+      const halfBeat = halfBeatIndex >= 0 ? Math.max(0, env[halfBeatIndex] - threshold * 0.3) : 0;
+      score += a * (oneBeat + twoBeats * 0.42 + halfBeat * 0.16);
       weight += a;
     }
     score /= Math.max(0.001, weight);
     const bpm = (60 * frameRate) / lag;
-    const commonTempoBias = 1 + Math.max(0, 1 - Math.abs(bpm - 118) / 90) * 0.035;
+    const commonTempoBias = 1 + Math.max(0, 1 - Math.abs(bpm - 116) / 105) * 0.025;
     score *= commonTempoBias;
     if (score > bestScore) {
       bestScore = score;
@@ -462,30 +842,41 @@ function estimateBpm(envelopes) {
   }
 
   let bpm = (60 * frameRate) / bestLag;
-  if (bpm < 78) bpm *= 2;
-  if (bpm > 176 && bpm / 2 >= 78) bpm /= 2;
+  if (bpm < 72) bpm *= 2;
+  if (bpm > 186 && bpm / 2 >= 72) bpm /= 2;
   return clamp(Math.round(bpm), 45, 260);
 }
 
-function findGridStart(envelopes, bpm) {
-  const beatDuration = 60 / bpm;
-  const env = envelopes.total;
-  const threshold = positivePercentile(env, 0.82);
-  const bins = 64;
+function findGridStart(envelopes, bpm, candidates = []) {
+  const stepDuration = (60 / bpm) / 4;
+  const bins = 48;
   const histogram = new Float64Array(bins);
-  const maxFrame = Math.min(env.length, Math.floor(envelopes.frameRate * 180));
-  for (let i = 0; i < maxFrame; i += 1) {
-    if (env[i] < threshold) continue;
-    const time = i / envelopes.frameRate;
-    const phase = ((time % beatDuration) + beatDuration) % beatDuration;
-    const bin = Math.min(bins - 1, Math.floor((phase / beatDuration) * bins));
-    histogram[bin] += env[i] * env[i];
+  const maxFrame = Math.floor(envelopes.frameRate * 240);
+  for (const candidate of candidates) {
+    if (candidate.frame > maxFrame) break;
+    const time = candidate.frame / envelopes.frameRate;
+    const phase = ((time % stepDuration) + stepDuration) % stepDuration;
+    const bin = Math.min(bins - 1, Math.floor((phase / stepDuration) * bins));
+    const shellWeight = Math.max(candidate.ratios.low, candidate.ratios.mid);
+    histogram[bin] += Math.min(4, candidate.ratios.combined) * (0.65 + Math.min(2, shellWeight) * 0.35);
   }
   let bestBin = 0;
   for (let i = 1; i < bins; i += 1) {
     if (histogram[i] > histogram[bestBin]) bestBin = i;
   }
-  return (bestBin / bins) * beatDuration;
+  // Circular weighted refinement gives sub-bin timing without being pulled by
+  // candidates on the opposite edge of the histogram.
+  let weightedOffset = 0;
+  let weight = 0;
+  for (let delta = -2; delta <= 2; delta += 1) {
+    const index = (bestBin + delta + bins) % bins;
+    weightedOffset += delta * histogram[index];
+    weight += histogram[index];
+  }
+  const refinedBin = bestBin + (weight ? weightedOffset / weight : 0);
+  let signedBin = ((refinedBin + bins) % bins);
+  if (signedBin > bins / 2) signedBin -= bins;
+  return (signedBin / bins) * stepDuration;
 }
 
 function peakNear(array, center, radius = 2) {
@@ -547,35 +938,42 @@ function spectralEnergyShares(envelopes, frame) {
 function transcribe(envelopes, bpm, sensitivity) {
   const info = signatureInfo();
   const stepDuration = (60 / bpm) / 4;
-  state.gridStart = findGridStart(envelopes, bpm);
+  const analysis = analysisFeatures(envelopes, sensitivity);
+  const candidates = findOnsetCandidates(envelopes, analysis, sensitivity);
+  state.gridStart = findGridStart(envelopes, bpm, candidates);
   state.totalSteps = Math.max(
     info.stepsPerBar,
     Math.ceil((envelopes.duration - state.gridStart) / stepDuration)
   );
   state.events.clear();
 
-  const quantile = 0.955 - ((sensitivity - 35) / 50) * 0.145;
-  const totalThreshold = positivePercentile(envelopes.total, clamp(quantile - 0.03, 0.72, 0.96));
-  const lowThreshold = positivePercentile(envelopes.low, clamp(quantile, 0.75, 0.97));
-  const midThreshold = positivePercentile(envelopes.mid, clamp(quantile, 0.75, 0.97));
-  const highThreshold = positivePercentile(envelopes.high, clamp(quantile - 0.02, 0.73, 0.96));
-
   let lastCrashStep = -info.stepsPerBar;
   let lastShellFrame = -1;
   let lastCymbalFrame = -1;
-  for (let step = 0; step < state.totalSteps; step += 1) {
-    const time = state.gridStart + step * stepDuration;
-    const frame = Math.round(time * envelopes.frameRate);
+  const bestCandidateByStep = new Map();
+  for (const candidate of candidates) {
+    const time = candidate.frame / envelopes.frameRate;
+    const step = Math.round((time - state.gridStart) / stepDuration);
+    if (step < 0 || step >= state.totalSteps) continue;
+    const gridTime = state.gridStart + step * stepDuration;
+    const error = Math.abs(time - gridTime) / stepDuration;
+    if (error > 0.46) continue;
+    const score = candidate.ratios.combined * (1 - error * 0.42);
+    const previous = bestCandidateByStep.get(step);
+    if (!previous || score > previous.score) bestCandidateByStep.set(step, { ...candidate, score });
+  }
+
+  for (const [step, candidate] of [...bestCandidateByStep.entries()].sort((a, b) => a[0] - b[0])) {
+    const frame = candidate.frame;
     const profile = transientProfile(envelopes, frame, "total");
     const cymbalProfile = transientProfile(envelopes, frame, "high");
     const spectrum = spectralEnergyShares(envelopes, profile.frame);
     const cymbalSpectrum = spectralEnergyShares(envelopes, cymbalProfile.frame);
-    const total = peakNear(envelopes.total, profile.frame, 1) / Math.max(0.0001, totalThreshold);
-    const low = peakNear(envelopes.low, profile.frame, 1) / Math.max(0.0001, lowThreshold);
-    const mid = peakNear(envelopes.mid, profile.frame, 1) / Math.max(0.0001, midThreshold);
-    const high = peakNear(envelopes.high, profile.frame, 1) / Math.max(0.0001, highThreshold);
-    const cymbalTotal = peakNear(envelopes.total, cymbalProfile.frame, 1) / Math.max(0.0001, totalThreshold);
-    const cymbalHigh = peakNear(envelopes.high, cymbalProfile.frame, 1) / Math.max(0.0001, highThreshold);
+    const shellRatios = onsetStrengthAt(envelopes, analysis, profile.frame);
+    const cymbalRatios = onsetStrengthAt(envelopes, analysis, cymbalProfile.frame);
+    const { total, low, mid, high } = shellRatios;
+    const cymbalTotal = cymbalRatios.total;
+    const cymbalHigh = cymbalRatios.high;
     const beatPosition = step % info.pulseSteps;
     const barPosition = step % info.stepsPerBar;
     const strict = state.drumIsolation;
@@ -717,9 +1115,12 @@ async function ensureEnvelopes(showInlineProgress = false) {
   return state.envelopes;
 }
 
-async function runAnalysis() {
-  if (!state.audioBuffer || state.analyzing) return;
+async function runAnalysis({ resume = false, preserveScore = false } = {}) {
+  if ((!resume && !state.audioBlob) || state.analyzing) return;
   state.analyzing = true;
+  state.cancelRequested = false;
+  if (!resume) state.currentJob = null;
+  setAnalysisBusy(true);
   ui.analyzeButton.disabled = true;
   ui.scoreCard.classList.add("is-hidden");
   ui.progressCard.classList.remove("is-hidden");
@@ -727,34 +1128,52 @@ async function runAnalysis() {
   ui.progressCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
   try {
-    await sleep(120);
-    const envelopes = await ensureEnvelopes(true);
-    setProgress(56, "박자와 속도를 찾고 있어요", "강한 타격의 반복 간격을 비교하는 중…");
-    await nextPaint();
-
-    let bpm;
-    if (state.isDemo && state.demoTruth) {
-      bpm = state.demoTruth.bpm;
+    resetPlayback();
+    if (state.analysisMode === "pro") {
+      const { id, result } = await DrumPro.analyze(state.audioBlob, {
+        inputIsDrums: ui.inputIsDrums.checked, sensitivity: state.sensitivity,
+        bpm: state.bpmManual ? state.bpm : null,
+        title: state.fileName.slice(0, 200), jobId: resume ? state.currentJob : undefined,
+      }, (percent, detail) => {
+        setProgress(percent, "드럼 분리 · AI 채보", detail);
+        if (!preserveScore && percent >= 3 && state.jobStage !== "running") { state.jobStage = "running"; saveWorkspace(); }
+        ui.engineStatus.textContent = percent >= 3 ? "맥에서 작업 중 · 다른 창을 봐도 계속됩니다" : detail;
+      }, async id => {
+        state.currentJob = id;
+        if (!preserveScore) state.jobStage = "uploading";
+        await saveWorkspace();
+      }, () => state.cancelRequested);
+      setProgress(99, "드럼 음원을 준비하고 있어요", "맥에서 분리된 드럼을 가져옵니다…");
+      const stem = await DrumPro.file(id, "drums.wav", () =>
+        setProgress(99, "완료된 드럼 음원 연결 중", "네트워크가 돌아오면 결과를 이어서 가져옵니다"), () => state.cancelRequested);
+      if (state.cancelRequested) throw Object.assign(new Error("분석을 취소했습니다."), { jobState: "cancelled" });
+      if (state.activeSource !== "original") await selectAudioSource("original");
+      if (!preserveScore) {
+        clearProResult();
+        state.events.clear();
+        state.proResult = result;
+        state.bpm = state.bpmManual ? state.bpm : result.bpm || state.bpm;
+        requantizeProResult();
+      }
+      await attachStem(stem);
+      await DrumWorkspace.putMedia(state.workspaceId, "drums", stem).catch(storageWarning);
     } else {
-      bpm = estimateBpm(envelopes);
+      if (state.activeSource !== "original") await selectAudioSource("original");
+      const envelopes = await ensureEnvelopes(true);
+      clearProResult();
+      setProgress(65, "타격을 찾고 있어요", "브라우저에서 빠른 채보를 진행합니다…");
+      await nextPaint();
+      if (!state.bpmManual) state.bpm = estimateBpm(envelopes);
+      transcribe(envelopes, state.bpm, state.sensitivity);
     }
-    state.bpm = bpm;
-    ui.bpmInput.value = String(bpm);
-    await sleep(80);
+    ui.bpmInput.value = String(state.bpm);
+    updateBpmModeLabel();
 
-    setProgress(72, "드럼 타격을 구분하고 있어요", "기타·보컬의 지속음과 순간 타격음을 나누는 중…");
-    await nextPaint();
-
-    if (state.isDemo && state.demoTruth) {
-      applyDemoTruth();
-    } else {
-      transcribe(envelopes, bpm, state.sensitivity);
-    }
-
-    setProgress(91, "악보로 정리하고 있어요", "타격 간격에 따라 8분·16분음표로 묶는 중…");
-    await sleep(130);
     renderScore();
+    state.jobStage = "completed";
     saveLocalProject();
+    await saveWorkspace();
+    ui.engineStatus.textContent = "채보 완료 · 음악과 악보 자동 저장됨";
     setProgress(100, "악보가 완성됐어요", "원곡을 재생하며 주황색 음표부터 확인해 보세요.");
     await sleep(320);
     ui.progressCard.classList.add("is-hidden");
@@ -763,19 +1182,18 @@ async function runAnalysis() {
   } catch (error) {
     console.error(error);
     ui.progressCard.classList.add("is-hidden");
+    if (state.totalSteps) ui.scoreCard.classList.remove("is-hidden");
     showToast(error.message || "분석 중 문제가 생겼어요. 다른 파일로 다시 시도해 주세요.");
+    ui.engineStatus.textContent = error.message || "분석에 실패했습니다.";
+    if (error.jobState || [400, 403, 404, 409, 413, 422].includes(error.status)) {
+      state.jobStage = error.jobState || "failed";
+    }
+    await saveWorkspace();
   } finally {
     state.analyzing = false;
-    ui.analyzeButton.disabled = !state.audioBuffer;
+    setAnalysisBusy(false);
+    ui.analyzeButton.disabled = !state.audioBlob;
   }
-}
-
-function applyDemoTruth() {
-  state.events.clear();
-  state.bpm = state.demoTruth.bpm;
-  state.gridStart = 0;
-  state.totalSteps = state.demoTruth.totalSteps;
-  for (const event of state.demoTruth.events) addEvent(event.step, event.instrument, event.confidence, "auto");
 }
 
 function countLabelForStep(step, info) {
@@ -812,12 +1230,13 @@ function barsPerNotationSystem() {
 }
 
 function drawNoteHead(parent, x, instrument, event) {
-  const lowConfidence = event.confidence < 0.58 && event.source !== "manual";
+  const lowConfidence = (event.confidence < 0.58 || event.needsTimingReview || ["tom", "cymbal"].includes(instrument.id)) && event.source !== "manual";
   const group = svgElement("g", {
     class: `notation-note ${lowConfidence ? "low-confidence" : ""}`,
     transform: `translate(${x} ${instrument.staffY})`,
   });
-  group.append(svgElement("title", {}, `${instrument.name} · 신뢰도 ${Math.round(event.confidence * 100)}%`));
+  const timing = event.needsTimingReview ? ` · 박자 오차 ${Math.round(event.timingError * 1000)}ms 확인` : "";
+  group.append(svgElement("title", {}, `${instrument.name} · 모델 점수 ${Math.round(event.confidence * 100)}%${timing}`));
 
   if (instrument.mark === "circle") {
     group.append(svgElement("ellipse", { cx: 0, cy: 0, rx: 5.8, ry: 4.1, transform: "rotate(-18)", class: "filled-head" }));
@@ -1052,7 +1471,9 @@ function updateCurrentScoreStep(time) {
   if (!state.totalSteps) return;
   const info = signatureInfo();
   const stepDuration = (60 / state.bpm) / 4;
-  const step = Math.floor((time - state.gridStart + stepDuration * 0.35) / stepDuration);
+  const step = state.gridTimes
+    ? DrumTiming.nearestStep(state.gridTimes, time)
+    : Math.floor((time - state.gridStart + stepDuration * 0.35) / stepDuration);
   if (step === state.currentRenderedStep) return;
   for (const current of $$(".note-slot.current-step", ui.scoreScroll)) current.classList.remove("current-step");
   state.currentRenderedStep = step;
@@ -1230,6 +1651,7 @@ function createDemoWav(pattern) {
 }
 
 async function loadDemo() {
+  if (state.analyzing) return;
   const pattern = buildDemoPattern();
   state.isDemo = true;
   state.demoTruth = pattern;
@@ -1238,6 +1660,7 @@ async function loadDemo() {
   state.isDemo = true;
   state.demoTruth = pattern;
   state.bpm = pattern.bpm;
+  state.bpmManual = false;
   ui.bpmInput.value = String(pattern.bpm);
   await runAnalysis();
 }
@@ -1245,7 +1668,7 @@ async function loadDemo() {
 function projectData() {
   return {
     format: "drumscore-project",
-    version: 3,
+    version: 4,
     title: state.fileName.replace(/\.[^.]+$/, "") || "드럼 악보",
     createdAt: new Date().toISOString(),
     bpm: state.bpm,
@@ -1256,6 +1679,11 @@ function projectData() {
     sensitivity: state.sensitivity,
     drumIsolation: state.drumIsolation,
     events: [...state.events.values()],
+    proResult: state.proResult,
+    gridTimes: state.gridTimes,
+    gridOffset: state.gridOffset,
+    bpmManual: state.bpmManual,
+    removedAiHits: [...state.removedAiHits],
   };
 }
 
@@ -1265,40 +1693,64 @@ function saveLocalProject() {
   } catch (error) {
     console.warn("Local save unavailable", error);
   }
+  saveWorkspace();
 }
 
-function loadProjectData(project, fileName = "저장한 드럼 악보") {
+function loadProjectData(project, fileName = "저장한 드럼 악보", preserveAudio = false) {
   if (!project || project.format !== "drumscore-project" || !Array.isArray(project.events)) {
     throw new Error("드럼스코어 프로젝트 파일이 아닙니다.");
   }
   resetPlayback();
-  state.fileName = project.title || fileName;
-  state.fileSize = 0;
-  state.audioBuffer = null;
+  ++state.loadVersion;
+  clearProResult();
+  if (!preserveAudio) {
+    if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+    state.objectUrl = "";
+    state.audioBlob = null;
+    state.audioBuffer = null;
+    state.workspaceId = crypto.randomUUID();
+    state.currentJob = null;
+    state.jobStage = "completed";
+  }
+  state.fileName = typeof project.title === "string" ? project.title : fileName;
+  if (!preserveAudio) state.fileSize = 0;
   state.envelopes = null;
   state.isDemo = false;
   state.demoTruth = null;
   state.bpm = clamp(Number(project.bpm) || 120, 45, 260);
   state.timeSignature = ["4/4", "3/4", "6/8"].includes(project.timeSignature) ? project.timeSignature : "4/4";
   state.gridStart = Number(project.gridStart) || 0;
-  state.totalSteps = Math.max(1, Number(project.totalSteps) || 16);
+  state.totalSteps = clamp(Math.floor(Number(project.totalSteps) || 16), 1, 20000);
   state.difficulty = ["easy", "standard", "exact"].includes(project.difficulty) ? project.difficulty : "standard";
   state.sensitivity = clamp(Number(project.sensitivity) || 62, 35, 85);
   state.drumIsolation = project.drumIsolation !== false;
+  state.bpmManual = project.bpmManual === true;
+  state.gridOffset = clamp(Number(project.gridOffset) || 0, -10, 10);
+  if (Array.isArray(project.gridTimes) && project.gridTimes.length === state.totalSteps &&
+      project.gridTimes.every((t, i, times) => Number.isFinite(t) && (i === 0 || t > times[i - 1]))) {
+    state.gridTimes = project.gridTimes;
+  }
+  if (project.proResult) state.proResult = DrumPro.validate(project.proResult);
+  state.removedAiHits = new Set(Array.isArray(project.removedAiHits) ? project.removedAiHits.filter(v => typeof v === "string").slice(0, 50000) : []);
   state.events.clear();
   for (const event of project.events) {
-    const instrumentId = event.instrument === "tom" ? "tomMid" : event.instrument;
+    if (!event || typeof event !== "object") continue;
+    const instrumentId = project.version < 4 && event.instrument === "tom" ? "tomMid" : event.instrument;
     if (INSTRUMENTS.some((item) => item.id === instrumentId)) {
-      addEvent(Number(event.step), instrumentId, Number(event.confidence) || 1, event.source || "manual");
+      const step = Number(event.step);
+      if (!Number.isInteger(step) || step < 0 || step >= state.totalSteps) continue;
+      addEvent(step, instrumentId, Number.isFinite(event.confidence) ? event.confidence : 1, event.source || "manual");
+      const restored = hasEvent(step, instrumentId);
+      for (const key of ["time", "velocity", "timingError"]) if (Number.isFinite(event[key])) restored[key] = event[key];
+      restored.needsTimingReview = event.needsTimingReview === true;
     }
   }
-  ui.audio.removeAttribute("src");
-  ui.audio.load();
+  if (!preserveAudio) { ui.audio.removeAttribute("src"); ui.audio.load(); }
   ui.currentTime.textContent = "0:00";
   ui.duration.textContent = "0:00";
   ui.playhead.style.left = "0%";
   ui.trackName.textContent = state.fileName;
-  ui.trackDetails.textContent = "프로젝트 악보 · 원곡은 다시 선택하면 함께 들을 수 있어요";
+  ui.trackDetails.textContent = "저장한 프로젝트 악보 · 음원은 포함되지 않습니다";
   ui.uploadPanel.classList.add("is-hidden");
   ui.workspace.classList.remove("is-hidden");
   ui.waveEmpty.textContent = "원곡 오디오가 연결되지 않은 프로젝트입니다.";
@@ -1311,6 +1763,13 @@ function loadProjectData(project, fileName = "저장한 드럼 악보") {
   ui.scoreStopButton.disabled = true;
   ui.analyzeButton.disabled = true;
   ui.bpmInput.value = String(state.bpm);
+  ui.gridOffset.value = String(state.gridOffset * 1000);
+  updateBpmModeLabel();
+  ui.exportPerformance.disabled = !state.proResult;
+  if (state.proResult) {
+    ui.analysisReport.textContent = `저장한 AI 검출 원본 ${state.proResult.events.length}타격. ${state.proResult.warnings.join(" ")}`;
+    ui.analysisReport.classList.remove("is-hidden");
+  }
   ui.timeSignature.value = state.timeSignature;
   ui.sensitivity.value = String(state.sensitivity);
   ui.sensitivityValue.textContent = `${state.sensitivity}%`;
@@ -1321,6 +1780,13 @@ function loadProjectData(project, fileName = "저장한 드럼 악보") {
   ui.difficultyHelp.textContent = DIFFICULTY_HELP[state.difficulty];
   renderScore();
   ui.scoreCard.classList.remove("is-hidden");
+  if (preserveAudio && state.audioBuffer) {
+    updateTrackMeta();
+    drawWaveform(state.audioBuffer);
+    ui.waveEmpty.classList.add("is-hidden");
+    for (const control of [ui.playButton, ui.stopButton, ui.scorePlayButton, ui.scoreStopButton]) control.disabled = false;
+  }
+  saveWorkspace();
   showToast("프로젝트 악보를 열었어요.");
 }
 
@@ -1377,7 +1843,7 @@ function musicXmlVoiceBody(byStep, measureStart, info, voice, stem) {
     onset.hits.forEach((event, hitIndex) => {
       const instrument = instrumentById(event.instrument);
       const notehead = instrument.mark.includes("cross") ? "x" : "normal";
-      body += `<note>${hitIndex ? "<chord/>" : ""}<unpitched><display-step>${instrument.displayStep}</display-step><display-octave>${instrument.displayOctave}</display-octave></unpitched><duration>${duration}</duration><instrument id="P1-I${instrument.midi}"/><voice>${voice === "upper" ? 1 : 2}</voice><type>${value.type}</type>${value.dots}<stem>${stem}</stem><notehead>${notehead}</notehead></note>`;
+      body += `<note>${hitIndex ? "<chord/>" : ""}<unpitched><display-step>${instrument.displayStep}</display-step><display-octave>${instrument.displayOctave}</display-octave></unpitched><duration>${duration}</duration><instrument id="P1-${instrument.id}"/><voice>${voice === "upper" ? 1 : 2}</voice><type>${value.type}</type>${value.dots}<stem>${stem}</stem><notehead>${notehead}</notehead></note>`;
     });
     cursor = onset.local + duration;
   }
@@ -1410,8 +1876,8 @@ function exportMusicXml() {
     measures += `<measure number="${bar + 1}">${body}</measure>`;
   }
 
-  const scoreInstruments = INSTRUMENTS.map((item) => `<score-instrument id="P1-I${item.midi}"><instrument-name>${escapeXml(item.name)}</instrument-name></score-instrument>`).join("");
-  const midiInstruments = INSTRUMENTS.map((item) => `<midi-instrument id="P1-I${item.midi}"><midi-channel>10</midi-channel><midi-unpitched>${item.midi + 1}</midi-unpitched></midi-instrument>`).join("");
+  const scoreInstruments = INSTRUMENTS.map((item) => `<score-instrument id="P1-${item.id}"><instrument-name>${escapeXml(item.name)}</instrument-name></score-instrument>`).join("");
+  const midiInstruments = INSTRUMENTS.map((item) => `<midi-instrument id="P1-${item.id}"><midi-channel>10</midi-channel><midi-unpitched>${item.midi + 1}</midi-unpitched></midi-instrument>`).join("");
   const xml = `<?xml version="1.0" encoding="UTF-8" standalone="no"?><!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd"><score-partwise version="4.0"><work><work-title>${escapeXml(safeBaseName())}</work-title></work><part-list><score-part id="P1"><part-name>Drumset</part-name>${scoreInstruments}${midiInstruments}</score-part></part-list><part id="P1">${measures}</part></score-partwise>`;
   downloadBlob(new Blob([xml], { type: "application/vnd.recordare.musicxml+xml" }), `${safeBaseName()}.musicxml`);
 }
@@ -1435,7 +1901,8 @@ function pushUint32(target, value) {
   target.push((value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff);
 }
 
-function exportMidi() {
+function exportMidi(performance = false) {
+  if (performance && !state.proResult) return;
   const ppq = 480;
   const ticksPerStep = 120;
   const microseconds = Math.round(60000000 / state.bpm);
@@ -1445,10 +1912,10 @@ function exportMidi() {
   track.push(0x00, 0xff, 0x51, 0x03, (microseconds >> 16) & 0xff, (microseconds >> 8) & 0xff, microseconds & 0xff);
   track.push(0x00, 0xff, 0x58, 0x04, info.beats, denominatorPower, 24, 8);
   const midiEvents = [];
-  for (const event of visibleEvents()) {
+  for (const event of performance ? state.proResult.events : visibleEvents()) {
     const instrument = INSTRUMENTS.find((item) => item.id === event.instrument);
-    const tick = event.step * ticksPerStep;
-    const velocity = clamp(Math.round(48 + event.confidence * 76), 1, 127);
+    const tick = performance ? Math.round(event.time * ppq * 1000000 / microseconds) : event.step * ticksPerStep;
+    const velocity = clamp(Math.round(event.velocity || 48 + event.confidence * 76), 1, 127);
     midiEvents.push({ tick, order: 1, data: [0x99, instrument.midi, velocity] });
     midiEvents.push({ tick: tick + 42, order: 0, data: [0x89, instrument.midi, 0] });
   }
@@ -1463,18 +1930,34 @@ function exportMidi() {
   const bytes = [0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, (ppq >> 8) & 0xff, ppq & 0xff];
   bytes.push(0x4d, 0x54, 0x72, 0x6b);
   pushUint32(bytes, track.length);
-  bytes.push(...track);
-  downloadBlob(new Blob([new Uint8Array(bytes)], { type: "audio/midi" }), `${safeBaseName()}.mid`);
+  const file = new Uint8Array(bytes.length + track.length);
+  file.set(bytes);
+  file.set(track, bytes.length);
+  downloadBlob(new Blob([file], { type: "audio/midi" }), `${safeBaseName()}${performance ? "-AI-performance" : "-score"}.mid`);
 }
 
 async function autoDetectBpm() {
-  if (!state.audioBuffer || state.analyzing) return;
+  if ((!state.audioBuffer && !state.proResult) || state.analyzing) return;
   const oldText = ui.detectBpmButton.textContent;
   ui.detectBpmButton.textContent = "…";
   ui.detectBpmButton.disabled = true;
   try {
+    state.bpmManual = false;
+    if (state.proResult) {
+      if (state.proResult.bpm) state.bpm = state.proResult.bpm;
+      ui.bpmInput.value = String(state.bpm);
+      requantizeProResult();
+      renderScore();
+      saveLocalProject();
+      showToast("AI가 검출한 박자 지도로 돌아갔어요.");
+      return;
+    }
+    if (state.analysisMode === "pro") {
+      showToast("다음 AI 채보에서 BPM을 자동으로 찾습니다.");
+      return;
+    }
     const envelopes = await ensureEnvelopes(false);
-    const bpm = state.isDemo && state.demoTruth ? state.demoTruth.bpm : estimateBpm(envelopes);
+    const bpm = estimateBpm(envelopes);
     state.bpm = bpm;
     ui.bpmInput.value = String(bpm);
     if (state.totalSteps) {
@@ -1485,6 +1968,7 @@ async function autoDetectBpm() {
   } catch (error) {
     showToast(error.message || "BPM을 찾지 못했어요.");
   } finally {
+    updateBpmModeLabel();
     ui.detectBpmButton.textContent = oldText;
     ui.detectBpmButton.disabled = false;
   }
@@ -1531,6 +2015,33 @@ ui.demoButton.addEventListener("click", loadDemo);
 ui.helpButton.addEventListener("click", () => ui.helpDialog.showModal());
 ui.analyzeButton.addEventListener("click", runAnalysis);
 ui.detectBpmButton.addEventListener("click", autoDetectBpm);
+ui.connectEngine.addEventListener("click", connectEngine);
+ui.analysisMode.addEventListener("change", () => {
+  state.analysisMode = ui.analysisMode.value;
+  ui.enginePanel.classList.toggle("is-hidden", state.analysisMode !== "pro");
+  ui.quickIsolation.classList.toggle("is-hidden", state.analysisMode === "pro");
+  ui.gridOffset.disabled = state.analysisMode !== "pro";
+});
+ui.cancelAnalysis.addEventListener("click", () => {
+  state.cancelRequested = true;
+  ui.cancelAnalysis.disabled = true;
+  setProgress(0, "분석을 취소하고 있어요", "현재 오디오 구간 처리가 끝나면 취소됩니다.");
+  if (state.currentJob) DrumPro.cancel(state.currentJob).catch(error => showToast(error.message));
+});
+ui.listenOriginal.addEventListener("click", () => selectAudioSource("original").catch(error => showToast(error.message)));
+ui.listenDrums.addEventListener("click", () => selectAudioSource("drums").catch(error => showToast(error.message)));
+ui.downloadStem.addEventListener("click", () => {
+  if (state.stemBlob) downloadBlob(state.stemBlob, `${safeBaseName()}-drums.wav`);
+});
+ui.gridOffset.addEventListener("change", () => {
+  state.gridOffset = clamp(Number(ui.gridOffset.value) || 0, -10000, 10000) / 1000;
+  ui.gridOffset.value = String(state.gridOffset * 1000);
+  if (state.proResult) {
+    requantizeProResult();
+    renderScore();
+    saveLocalProject();
+  }
+});
 
 ui.playButton.addEventListener("click", async () => {
   if (!ui.audio.src) return;
@@ -1591,7 +2102,10 @@ ui.waveform.parentElement.addEventListener("click", (event) => {
 
 ui.bpmInput.addEventListener("change", () => {
   state.bpm = clamp(Number(ui.bpmInput.value) || 120, 45, 260);
-  ui.bpmInput.value = String(Math.round(state.bpm));
+  state.bpmManual = true;
+  ui.bpmInput.value = String(state.bpm);
+  updateBpmModeLabel();
+  if (state.proResult) requantizeProResult();
   if (state.totalSteps) {
     renderScore();
     saveLocalProject();
@@ -1654,7 +2168,15 @@ ui.metronomeToggle.addEventListener("click", () => {
 
 function toggleSelectedInstrumentAtStep(step) {
   const instrument = state.selectedInstrument;
-  if (hasEvent(step, instrument)) {
+  const existing = hasEvent(step, instrument);
+  if (existing) {
+    if (existing.source === "ai") {
+      for (const raw of state.proResult?.events || []) {
+        if (raw.instrument === instrument && DrumTiming.nearestStep(state.gridTimes, raw.time) === step) {
+          state.removedAiHits.add(`${raw.time}:${instrument}`);
+        }
+      }
+    }
     removeEvent(step, instrument);
   } else {
     addEvent(step, instrument, 1, "manual");
@@ -1690,6 +2212,7 @@ ui.exportPopover.addEventListener("click", (event) => {
   ui.exportButton.setAttribute("aria-expanded", "false");
   if (button.dataset.export === "pdf") window.print();
   if (button.dataset.export === "midi") exportMidi();
+  if (button.dataset.export === "performance") exportMidi(true);
   if (button.dataset.export === "musicxml") exportMusicXml();
   if (button.dataset.export === "project") exportProject();
 });
@@ -1732,8 +2255,15 @@ window.addEventListener("afterprint", () => {
   renderScore();
 });
 
-window.addEventListener("beforeunload", () => {
-  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+// Save on edits and lifecycle transitions, not beforeunload (unreliable on
+// phones and can exclude Firefox pages from its back/forward cache).
+window.addEventListener("pagehide", saveWorkspace);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) saveWorkspace();
+});
+window.addEventListener("online", () => {
+  if (!state.analyzing && !state.restoring && ["running", "uploading"].includes(state.jobStage)) restoreWorkspace();
 });
 
 ui.scoreCard.classList.add("editing");
+restoreWorkspace();

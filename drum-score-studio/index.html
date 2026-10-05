@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0b0c0f" />
     <meta
       name="description"
-      content="MP3와 WAV를 브라우저에서 분석해 킥, 스네어, 하이햇 중심의 연습용 드럼 악보를 만드는 앱"
+      content="음악에서 드럼을 분리하고 AI로 타격을 채보합니다. 분리된 드럼 듣기, 악보 편집, 연주 MIDI 저장을 지원합니다."
     />
     <title>드럼스코어 — MP3 자동 드럼 채보</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -27,7 +27,7 @@
           </span>
         </a>
         <div class="top-actions">
-          <span class="privacy-chip"><i></i> 기기 안에서 분석</span>
+          <span class="privacy-chip"><i></i> 내 맥에서 AI 분석</span>
           <button class="icon-button" id="helpButton" type="button" aria-label="도움말 열기" title="도움말">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.8 9a2.35 2.35 0 0 1 4.5.9c0 1.8-2.3 2.1-2.3 3.6M12 17.4h.01"></path></svg>
           </button>
@@ -39,18 +39,19 @@
           <div class="upload-copy">
             <span class="eyebrow">자동 채보 · BETA</span>
             <h1 id="uploadTitle">곡을 넣으면 드럼 악보가 나와요.</h1>
-            <p>킥·스네어·하이햇의 타격을 찾고 BPM에 맞춰 연습용 악보로 정리합니다.</p>
+            <p>드럼을 따로 분리하고 AI로 타격을 채보합니다. 원곡과 드럼을 번갈아 들으며 악보를 완성하세요.</p>
             <div class="upload-actions">
               <label class="primary-button" for="audioFile">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 14v5h14v-5"></path></svg>
                 MP3 / WAV 선택
               </label>
-              <input id="audioFile" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac" hidden />
+              <input id="audioFile" type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg" hidden />
               <button class="secondary-button" id="demoButton" type="button">샘플 리듬으로 체험</button>
               <label class="secondary-button" for="projectFile">프로젝트 열기</label>
               <input id="projectFile" type="file" accept="application/json,.drumscore,.json" hidden />
             </div>
-            <p class="file-note">최대 12분 · 오디오 파일은 서버에 올라가지 않습니다.</p>
+            <p class="file-note">최대 12분 · 220MB · AI 분석은 내 맥에서 처리합니다. 휴대폰의 음악은 개인 연결을 통해 맥으로 전송됩니다.</p>
+            <p class="file-note">휴대폰에서는 Tailscale을 맥과 같은 계정으로 연결하세요. 맥은 켜져 있어야 하며, 유료 AI API는 사용하지 않습니다.</p>
           </div>
           <label class="drop-zone" id="dropZone" for="audioFile">
             <span class="vinyl" aria-hidden="true"><i></i></span>
@@ -105,11 +106,25 @@
               <span class="beta-badge">BETA</span>
             </div>
 
+            <label class="field engine-field">
+              <span>채보 방식</span>
+              <select id="analysisMode">
+                <option value="pro">AI 드럼 분리 + 채보</option>
+                <option value="quick">빠른 채보 · 브라우저 분석</option>
+              </select>
+            </label>
+            <div class="engine-panel" id="enginePanel">
+              <div class="engine-status-row"><span id="engineStatus" role="status">분석 엔진 연결 확인 전</span><button class="secondary-button" id="connectEngine" type="button">연결 확인</button></div>
+              <p>스마트폰에서 업로드하면 내 맥이 드럼을 분리하고 채보합니다. 곡 길이에 따라 수분 이상 걸릴 수 있습니다.</p>
+              <p>연결이 안 되면 맥의 실행 상태와 두 기기의 Tailscale 연결을 확인하세요.</p>
+              <label class="stem-input"><input id="inputIsDrums" type="checkbox" /> 이미 드럼만 있는 파일 · 분리 생략</label>
+            </div>
+
             <div class="setting-grid">
               <label class="field">
                 <span>BPM</span>
                 <div class="number-field">
-                  <input id="bpmInput" type="number" min="45" max="260" value="120" inputmode="numeric" />
+                  <input id="bpmInput" type="number" min="45" max="260" step="0.01" value="120" inputmode="decimal" />
                   <button id="detectBpmButton" type="button">자동</button>
                 </div>
               </label>
@@ -122,15 +137,20 @@
                 </select>
               </label>
             </div>
+            <div class="timing-controls">
+              <p id="bpmModeLabel">BPM 자동 · AI가 분리된 드럼에서 박자를 찾습니다.</p>
+              <label class="field"><span>박자 위치 보정 (ms)</span><input id="gridOffset" type="number" min="-10000" max="10000" step="10" value="0" /></label>
+              <small>음표가 원곡보다 늦으면 음수로 조정하세요. BPM은 4분음표 기준입니다.</small>
+            </div>
 
             <fieldset class="segmented-field">
               <legend>악보 난이도</legend>
               <div class="segmented" id="difficultyGroup">
                 <button type="button" data-difficulty="easy">쉬움</button>
-                <button type="button" data-difficulty="standard" class="active">표준</button>
-                <button type="button" data-difficulty="exact">원곡형</button>
+                <button type="button" data-difficulty="standard">표준</button>
+                <button type="button" data-difficulty="exact" class="active">원곡형</button>
               </div>
-              <p id="difficultyHelp">불확실한 타격과 지나치게 촘촘한 음을 정리합니다.</p>
+              <p id="difficultyHelp">감지한 타격을 모두 표시합니다. 16분음표보다 촘촘한 연주는 연주 MIDI로 보존합니다.</p>
             </fieldset>
 
             <label class="slider-field">
@@ -139,7 +159,7 @@
               <small><span>또렷한 타격만</span><span>작은 타격까지</span></small>
             </label>
 
-            <label class="isolation-toggle">
+            <label class="isolation-toggle is-hidden" id="quickIsolation">
               <input id="drumIsolation" type="checkbox" checked />
               <span><b>다른 악기 억제</b><small>기타·보컬의 지속음을 최대한 제외</small></span>
               <i aria-hidden="true"></i>
@@ -161,6 +181,7 @@
               <b id="progressPercent">0%</b>
             </div>
             <div class="progress-track"><i id="progressBar"></i></div>
+            <button class="secondary-button is-hidden" id="cancelAnalysis" type="button">분석 취소</button>
           </section>
 
           <section class="score-card is-hidden" id="scoreCard" aria-labelledby="scoreTitle">
@@ -189,8 +210,9 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
                   </button>
                   <div class="export-popover is-hidden" id="exportPopover">
+                    <button type="button" data-export="performance" id="exportPerformance" disabled><b>연주 MIDI · AI 검출 원본</b><span>미세한 타이밍·연타 보존 · 수동 편집 전</span></button>
                     <button type="button" data-export="pdf"><b>PDF / 인쇄</b><span>인쇄 화면에서 PDF로 저장</span></button>
-                    <button type="button" data-export="midi"><b>MIDI</b><span>DAW·MuseScore에서 열기</span></button>
+                    <button type="button" data-export="midi"><b>악보 MIDI</b><span>현재 편집·난이도 반영 · 16분음표 정렬</span></button>
                     <button type="button" data-export="musicxml"><b>MusicXML</b><span>악보 프로그램용</span></button>
                     <button type="button" data-export="project"><b>프로젝트 파일</b><span>나중에 이어서 편집</span></button>
                   </div>
@@ -198,8 +220,18 @@
               </div>
             </div>
 
+            <div id="analysisReport" class="analysis-report is-hidden" role="status"></div>
+            <div id="stemControls" class="stem-controls is-hidden">
+              <span>비교해서 듣기</span>
+              <button id="listenOriginal" class="tool-button active" type="button" aria-pressed="true">원곡</button>
+              <button id="listenDrums" class="tool-button" type="button" aria-pressed="false">분리된 드럼</button>
+              <button id="downloadStem" class="secondary-button" type="button">드럼 WAV 저장</button>
+            </div>
+
             <div class="instrument-palette" id="instrumentPalette" aria-label="입력할 드럼 선택">
               <span>찍을 악기</span>
+              <button type="button" data-inst="cymbal"><i class="inst-crash">×</i> 심벌 · 종류 확인</button>
+              <button type="button" data-inst="tom"><i class="inst-tom">●</i> 탐 · 높이 확인</button>
               <button type="button" data-inst="crash"><i class="inst-crash">×</i> 크래시</button>
               <button type="button" data-inst="ride"><i class="inst-ride">×</i> 라이드</button>
               <button type="button" data-inst="openHat"><i class="inst-open-hat">⊗</i> 오픈 HH</button>
@@ -242,19 +274,22 @@
           <button class="icon-button" value="close" aria-label="닫기">×</button>
         </div>
         <ol>
-          <li><b>음질이 선명한 원곡</b>을 넣고 먼저 표준 난이도로 분석해 보세요.</li>
+          <li>맥의 AI 엔진을 실행한 뒤 음원을 넣으세요. 휴대폰에서는 같은 계정의 Tailscale을 켜고 개인 주소로 접속합니다. AI는 맥에서 드럼을 분리한 후 5종 타격을 분석합니다.</li>
           <li>기타·보컬이 음표로 잡히면 <b>다른 악기 억제</b>를 켜고 민감도를 조금 낮춰 주세요.</li>
           <li>주황색 음표는 확신이 낮은 결과입니다. 원곡을 들으며 눌러서 고칠 수 있어요.</li>
           <li>록·메탈의 빠른 필인이나 고스트노트는 자동 분석이 틀릴 수 있습니다.</li>
           <li><b>× 음표는 하이햇·심벌</b>, 검은 타원은 탐·스네어·베이스드럼이며 5선의 높이로 악기를 구분합니다.</li>
         </ol>
-        <p>현재 버전은 브라우저에서 빠르게 만드는 연습용 채보입니다. 서버형 드럼 분리 모델을 연결하면 정확도를 더 높일 수 있어요.</p>
+        <p>탐 높이·라이드/크래시·오픈 하이햇은 직접 확인해 주세요. 악보는 16분음표 격자이며 셋잇단음표·스윙·빠른 연타의 원래 시점은 ‘연주 MIDI’에 보존됩니다. BPM 절반/두 배와 첫 박자를 확인하고, 박자 위치 보정으로 맞출 수 있습니다. 연주 MIDI는 AI 검출 원본이며 수동 편집은 악보 MIDI에 반영됩니다.</p>
         <button class="primary-button dialog-ok" value="close">확인</button>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <audio id="audio" preload="metadata"></audio>
-    <script src="./app.js"></script>
+    <script src="./timing.js?v=20260909-resume1"></script>
+    <script src="./pro-client.js?v=20260909-resume1"></script>
+    <script src="./workspace-store.js?v=20260909-resume1"></script>
+    <script src="./app.js?v=20260909-resume1"></script>
   </body>
 </html>
