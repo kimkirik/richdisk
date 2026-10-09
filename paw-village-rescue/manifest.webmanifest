@@ -1,0 +1,19 @@
+{
+  "id": "/richdisk/paw-village-rescue/",
+  "name": "멍멍 구조대 · 작은 발자국 마을",
+  "short_name": "멍멍 구조대",
+  "lang": "ko",
+  "start_url": "/richdisk/paw-village-rescue/",
+  "scope": "/richdisk/paw-village-rescue/",
+  "display": "standalone",
+  "theme_color": "#48744a",
+  "background_color": "#f3edd8",
+  "icons": [
+    {
+      "src": "/richdisk/paw-village-rescue/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

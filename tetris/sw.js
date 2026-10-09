@@ -1,17 +1,1 @@
-const CACHE='tetris-nocturne-v6';
-const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-install-192.png','./icon-512.png'];
-
-self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
-});
-
-self.addEventListener('activate',event=>{
-  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));
-});
-
-self.addEventListener('fetch',event=>{
-  if(event.request.method!=='GET')return;
-  event.respondWith(fetch(event.request).then(response=>{
-    const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));return response;
-  }).catch(()=>caches.match(event.request).then(hit=>hit||caches.match('./index.html'))));
-});
+const N="tetris-nocturne-github-richdisk-a1143886bc2b9047",F=["./","./app.css","./app.js","./icon-192.png","./icon-512.png","./icon-install-192.png","./index.html","./manifest.webmanifest"],P=new Set(F.map(p=>new URL(p,self.registration.scope).pathname));self.addEventListener('install',e=>e.waitUntil(caches.open(N).then(c=>c.addAll(F))));self.addEventListener('activate',e=>e.waitUntil(Promise.all([caches.keys().then(ns=>Promise.all(ns.filter(n=>n.startsWith('tetris-nocturne-github-richdisk-')&&n!==N).map(n=>caches.delete(n)))),self.clients.claim()])));self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==self.location.origin||!P.has(u.pathname))return;e.respondWith(caches.open(N).then(async c=>(await c.match(u.pathname,{ignoreSearch:true}))||fetch(e.request)))});

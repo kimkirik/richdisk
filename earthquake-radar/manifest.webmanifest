@@ -1,0 +1,26 @@
+{
+  "name": "세계 지진 레이더",
+  "short_name": "지진 레이더",
+  "description": "전 세계 주요 지진·홍수·산불·복합 산악재난 취약지·화산과 출처 기반 재난 상황을 확인합니다.",
+  "id": "/richdisk/earthquake-radar/",
+  "start_url": "/richdisk/earthquake-radar/",
+  "scope": "/richdisk/earthquake-radar/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07111a",
+  "theme_color": "#07111a",
+  "lang": "ko-KR",
+  "categories": [
+    "weather",
+    "education",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/richdisk/earthquake-radar/quake-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

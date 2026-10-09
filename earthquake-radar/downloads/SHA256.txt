@@ -1,0 +1,1 @@
+5d8cb5190800792b22910aa1679047af749c3b264eda1c2625e194f038fcf2a4  earthquake-radar-native-2.0.0-arm64.apk

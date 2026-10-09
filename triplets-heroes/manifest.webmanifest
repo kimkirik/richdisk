@@ -1,0 +1,19 @@
+{
+  "name": "삼둥이 히어로즈",
+  "short_name": "삼둥이",
+  "lang": "ko",
+  "start_url": "/richdisk/triplets-heroes/",
+  "scope": "/richdisk/triplets-heroes/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#080e1b",
+  "theme_color": "#080e1b",
+  "icons": [
+    {
+      "src": "/richdisk/triplets-heroes/sam-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

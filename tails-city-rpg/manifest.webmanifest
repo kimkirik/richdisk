@@ -1,0 +1,37 @@
+{
+  "id": "/richdisk/tails-city-rpg/",
+  "name": "테일즈 시티 — 리치와 떠나는 모험",
+  "short_name": "테일즈 시티",
+  "description": "강아지 친구들과 함께 도시를 구하는 모험 RPG",
+  "lang": "ko",
+  "start_url": "/richdisk/tails-city-rpg/",
+  "scope": "/richdisk/tails-city-rpg/",
+  "display": "standalone",
+  "background_color": "#244734",
+  "theme_color": "#244734",
+  "prefer_related_applications": false,
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "/richdisk/tails-city-rpg/icons/richi-anime-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/richdisk/tails-city-rpg/icons/richi-anime-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/richdisk/tails-city-rpg/icons/richi-anime-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

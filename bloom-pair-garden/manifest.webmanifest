@@ -1,0 +1,25 @@
+{
+  "id": "/richdisk/bloom-pair-garden/",
+  "name": "예쁜 꽃 연결하기",
+  "short_name": "꽃 연결하기",
+  "lang": "ko",
+  "start_url": "/richdisk/bloom-pair-garden/",
+  "scope": "/richdisk/bloom-pair-garden/",
+  "display": "standalone",
+  "background_color": "#edf5f0",
+  "theme_color": "#edf5f0",
+  "icons": [
+    {
+      "src": "/richdisk/bloom-pair-garden/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/richdisk/bloom-pair-garden/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

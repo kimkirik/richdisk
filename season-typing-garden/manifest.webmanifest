@@ -1,0 +1,32 @@
+{
+  "id": "/richdisk/season-typing-garden/",
+  "name": "사계절 타자정원",
+  "short_name": "타자정원",
+  "description": "사계절 문장과 낱말로 연습하는 한글 타자정원",
+  "lang": "ko",
+  "start_url": "/richdisk/season-typing-garden/",
+  "scope": "/richdisk/season-typing-garden/",
+  "display": "standalone",
+  "background_color": "#f7f5ee",
+  "theme_color": "#174d2c",
+  "icons": [
+    {
+      "src": "/richdisk/season-typing-garden/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/richdisk/season-typing-garden/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/richdisk/season-typing-garden/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

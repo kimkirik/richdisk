@@ -1,0 +1,22 @@
+{
+  "name": "과일 짝꿍 맞추기",
+  "short_name": "과일 짝꿍",
+  "start_url": "/richdisk/fruit-pair-play/",
+  "display": "standalone",
+  "background_color": "#f7f9f8",
+  "theme_color": "#247f60",
+  "icons": [
+    {
+      "src": "/richdisk/fruit-pair-play/game-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/richdisk/fruit-pair-play/game-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

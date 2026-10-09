@@ -106,7 +106,7 @@ export function sell(g, id) {
   if (g.paused || !["build", "combat"].includes(g.phase)) return false;
   const t = g.towers.find((t) => t.id === id);
   if (!t) return false;
-  g.energy += Math.floor(t.spent * 0.7);
+  g.energy += Math.floor((t.spent * 7) / 10);
   g.towers = g.towers.filter((t) => t.id !== id);
   g.status = "시설 회수 · 투자 에너지 70% 반환";
   return true;

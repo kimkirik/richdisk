@@ -1,0 +1,5 @@
+Thai IPA data from English Wiktionary via FastThaiG2P, c4759eef7df03e11fcbb9aa83efe8cf21709fd2f
+Source: https://raw.githubusercontent.com/awslabs/FastThaiG2P/c4759eef7df03e11fcbb9aa83efe8cf21709fd2f/data/sources/wiktionary_ipa.json
+Wiktionary contributors: https://en.wiktionary.org/
+Data license: Creative Commons Attribution-ShareAlike 4.0 https://creativecommons.org/licenses/by-sa/4.0/
+The IPA dictionary is distributed unchanged. Sorami converts IPA to approximate Hangul locally.
