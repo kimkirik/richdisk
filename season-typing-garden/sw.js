@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "season-typing-garden-";
-const CACHE_NAME = `${CACHE_PREFIX}2026-09-11-v2`;
+const CACHE_NAME = `${CACHE_PREFIX}2026-09-11-v2-ads-20261014`;
 const OFFLINE_URL = "/richdisk/season-typing-garden/offline.html";
 
 self.addEventListener("install", (event) => {

@@ -1,4 +1,4 @@
-const CACHE='sorami-gh-static-66da4b0a2e40',DICTIONARY='sorami-gh-dictionary-v1';
+const CACHE='sorami-gh-static-66da4b0a2e40-ads-20261014',DICTIONARY='sorami-gh-dictionary-v1';
 const SHELL=['./','./index.html','./app-66da4b0a2e40.js','./app-66da4b0a2e40.css','./reading-worker.js','./freedom-icon.svg','./freedom-180.png','./freedom-192.png','./freedom-512.png','./freedom-maskable-512.png','./manifest.webmanifest','./privacy.html'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('sorami-gh-static-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

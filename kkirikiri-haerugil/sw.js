@@ -1,5 +1,5 @@
 const APP_BASE = "/richdisk/kkirikiri-haerugil";
-const CACHE_NAME = "kkirikiri-pages-shell-v3-accuracy";
+const CACHE_NAME = "kkirikiri-pages-shell-v3-accuracy-ads-20261014";
 const STATIC_ASSETS = [
   `${APP_BASE}/`,
   `${APP_BASE}/calendar/`,
