@@ -711,11 +711,14 @@ var mountMapWorkspace=function mountMapWorkspace(document2, window2) {
     } else if (panel.contains(document2.activeElement)) (current === "none" ? menu.querySelector("summary") : toggle).focus({ preventScroll: true });
   }
   toggle.addEventListener("click", () => setOpen(panel.hidden, true));
-  panel.querySelector("button").addEventListener("click", (event) => {
+  const closePanel = (event) => {
     event.preventDefault();
     event.stopPropagation();
     setOpen(false);
-  });
+  };
+  const closePanelButton = panel.querySelector("button");
+  closePanelButton.addEventListener("pointerup", closePanel);
+  closePanelButton.addEventListener("click", closePanel);
   panel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       event.stopPropagation();
@@ -790,6 +793,11 @@ var mountNotificationDialog=function mountNotificationDialog(doc, win) {
     return event.target === dialog && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom);
   }
   toggle.addEventListener("click", open);
+  closeButton.addEventListener("pointerup", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  });
   closeButton.addEventListener("click", close);
   dialog.addEventListener("keydown", (event) => {
     if (event.key !== "Tab") return;
@@ -1351,6 +1359,7 @@ window.startRingquake=function(){
     var weatherId='place-weather-'+Date.now(),marker=L.marker([item.lat,item.lng],{pane:'locationPane',icon:L.divIcon({className:'search-location-icon',html:'<span class="search-location-pin"><span>⌖</span></span>',iconSize:[28,28],iconAnchor:[14,27]}),title:item.name}).bindPopup('<div class="popupMag" style="color:#ffd166">⌖ 지역 검색</div><div class="popupPlace">'+esc(placeNamesKo.place(item.name))+'</div><div class="placePopupActions"><button type="button" data-place-sea>🌊 이 지역 해수면</button><button type="button" data-place-close>닫기 ×</button></div><div class="popupMeta">'+coordText(item.lat,item.lng)+'</div>'+webcamPanel(item)+'<div class="placeWeather" id="'+weatherId+'"><div class="placeWeatherLoading">🌦️ 현재 날씨를 불러오는 중…</div></div><div class="popupWarn">장소 검색: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a></div>');
     marker.addTo(searchLayer);var b=item.bbox;
     if(Array.isArray(b)&&b.length===4&&b.every(isFinite)&&b[1]>b[0]&&b[3]>b[2])map.fitBounds([[b[0],b[2]],[b[1],b[3]]],{padding:[48,48],maxZoom:12,animate:false});else map.setView([item.lat,item.lng],12,{animate:false});
+    if(marker.once)marker.once('popupopen',function(){var popup=marker.getPopup&&marker.getPopup(),node=popup&&popup.getElement&&popup.getElement();if(!node)return;node.addEventListener('pointerup',function(event){var target=event.target&&event.target.closest?event.target:null;if(!target)return;if(target.closest('[data-place-close]')){event.preventDefault();event.stopPropagation();map.closePopup()}else if(target.closest('[data-place-sea]')){event.preventDefault();event.stopPropagation();openSearchSea()}})});
     marker.openPopup();loadPlaceWeather(item,weatherId);
   }
   function openSearchSea(){
@@ -1378,7 +1387,9 @@ window.startRingquake=function(){
     side.addEventListener('pointerup',finish,{passive:true});side.addEventListener('pointercancel',finish,{passive:true});side.addEventListener('lostpointercapture',finish,{passive:true});side.addEventListener('click',function(event){if(suppressNextClick){event.preventDefault();event.stopImmediatePropagation();suppressNextClick=false}},true);
     if(desktop.addEventListener)desktop.addEventListener('change',sync);else if(desktop.addListener)desktop.addListener(sync);sync();
   }
+  function bindReliableClose(buttonId,close){var button=el(buttonId);if(!button)return;button.addEventListener('pointerup',function(event){event.preventDefault();event.stopPropagation();close()})}
   function setupControls(){
+    bindReliableClose('mapHelpClose',function(){setMapHelp(false)});bindReliableClose('disasterReportClose',function(){setDisasterReport(false)});el('placeSearchResults').addEventListener('pointerup',function(event){var target=event.target&&event.target.closest?event.target.closest('[data-place-search-close]'):null;if(target){event.preventDefault();event.stopPropagation();closePlaceSearch();el('placeSearchInput').focus()}});
     var recent=document.querySelector('.recentCard');if(recent){recent.id='recentEarthquakes';recent.tabIndex=-1}
     document.querySelectorAll('.quickNav a').forEach(function(link){link.addEventListener('click',function(event){var target=document.querySelector(link.getAttribute('href'));if(!target)return;event.preventDefault();if(link.getAttribute('href')==='#map')selectMapMode('none');if(link.getAttribute('href')==='#recentEarthquakes'&&!isEarthquakeMode()){setMapModeState('earthquake');render()}if(link.getAttribute('href')==='#recentEarthquakes'&&mapWorkspace)mapWorkspace.open();target.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});target.focus({preventScroll:true})})});
     el('refreshData').addEventListener('click',function(){refreshLiveData(true)});
